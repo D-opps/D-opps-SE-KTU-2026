@@ -1,8 +1,23 @@
 import { Outlet, Link, useLocation } from 'react-router';
-import { Home, WashingMachine, ShoppingBag, MessageSquare, User } from 'lucide-react';
+import { Home, WashingMachine, ShoppingBag, MessageSquare, User, LogOut } from 'lucide-react';
+import { useNavigate } from 'react-router';
+import { useState, useEffect } from 'react';
 
 export function Layout() {
   const location = useLocation();
+  const navigate = useNavigate();
+  const [userRole, setUserRole] = useState<string>('student');
+
+  useEffect(() => {
+    const role = localStorage.getItem('userRole') || 'student';
+    setUserRole(role);
+  }, []);
+
+  const handleLogout = () => {
+    localStorage.removeItem('userRole');
+    localStorage.removeItem('userName');
+    navigate('/login');
+  };
 
   const navItems = [
     { path: '/', icon: Home, label: 'Dashboard' },
@@ -19,6 +34,17 @@ export function Layout() {
     return location.pathname.startsWith(path);
   };
 
+  const getRoleBadgeColor = () => {
+    switch (userRole) {
+      case 'admin':
+        return 'bg-purple-100 text-purple-700';
+      case 'doorkeeper':
+        return 'bg-green-100 text-green-700';
+      default:
+        return 'bg-blue-100 text-blue-700';
+    }
+  };
+
   return (
     <div className="flex h-screen bg-gray-50">
       {/* Sidebar Navigation */}
@@ -27,6 +53,10 @@ export function Layout() {
         <div className="p-4 lg:p-6 border-b border-gray-200">
           <h1 className="text-blue-600 text-xl lg:text-2xl hidden lg:block">DormLife</h1>
           <div className="text-blue-600 text-2xl lg:hidden text-center">DL</div>
+          {/* Role Badge */}
+          <div className={`mt-2 px-2 py-1 rounded text-xs text-center capitalize hidden lg:block ${getRoleBadgeColor()}`}>
+            {userRole}
+          </div>
         </div>
 
         {/* Navigation Items */}
@@ -53,6 +83,17 @@ export function Layout() {
             })}
           </ul>
         </nav>
+
+        {/* Logout Button */}
+        <div className="p-2 lg:p-4 border-t border-gray-200">
+          <button
+            onClick={handleLogout}
+            className="w-full flex items-center gap-3 px-3 lg:px-4 py-3 rounded-lg text-gray-600 hover:bg-red-50 hover:text-red-600 transition-colors"
+          >
+            <LogOut className="w-5 h-5 flex-shrink-0" />
+            <span className="hidden lg:inline">Logout</span>
+          </button>
+        </div>
       </aside>
 
       {/* Main Content */}

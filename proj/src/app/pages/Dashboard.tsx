@@ -1,18 +1,40 @@
 import { Link } from 'react-router';
 import { WashingMachine, ShoppingBag, MessageSquare, ArrowRight } from 'lucide-react';
 import { machines, marketplaceItems, chatMessages } from '../data/mockData';
+import { useState, useEffect } from 'react';
 
 export function Dashboard() {
+  const [userRole, setUserRole] = useState<string>('student');
+  const [userName, setUserName] = useState<string>('User');
+
+  useEffect(() => {
+    const role = localStorage.getItem('userRole') || 'student';
+    const name = localStorage.getItem('userName') || 'User';
+    setUserRole(role);
+    setUserName(name);
+  }, []);
+
   const availableMachines = machines.filter((m) => m.status === 'available').length;
   const recentItems = marketplaceItems.slice(0, 3);
   const recentMessages = chatMessages.filter((m) => m.room === 'general').slice(-3);
+
+  const getRoleGreeting = () => {
+    switch (userRole) {
+      case 'admin':
+        return 'Admin Dashboard';
+      case 'doorkeeper':
+        return 'Doorkeeper Dashboard';
+      default:
+        return 'Student Dashboard';
+    }
+  };
 
   return (
     <div className="p-4 lg:p-8 max-w-7xl mx-auto">
       {/* Header */}
       <div className="mb-8">
-        <h1 className="text-3xl mb-2">Welcome to DormLife</h1>
-        <p className="text-gray-600">Your dorm community dashboard</p>
+        <h1 className="text-3xl mb-2">Welcome back, {userName}!</h1>
+        <p className="text-gray-600">{getRoleGreeting()}</p>
       </div>
 
       {/* Quick Stats Cards */}
