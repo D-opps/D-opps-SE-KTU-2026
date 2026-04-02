@@ -56,3 +56,8 @@ htmlcov/
 # =========================
 *.zip
 *.tar.gz
+.venv/
+env/
+# Ignore Django auto migrations (optional)
+**/migrations/*.py[cod]
+**/migrations/__pycache__/
