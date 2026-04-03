@@ -1,0 +1,8 @@
+1. Download node.js on https://nodejs.org/en/download
+2. Add it to path search->environmental valiables->new->C:\Program Files\nodejs
+3. Open folder in vscode
+4. Open command prompt in vscode and check if everything installed correctly (node -v; npm -v)
+5. Install dependencies (npm install; npm install react react-dom)
+6. Restart vscode
+7. Then run (npm run dev) in command prompt in vscode
+8. You will get a link localhost/blahblahblah in terminal, open it and you will see the cite
