@@ -85,7 +85,7 @@ export function Login() {
         </div>
 
         {/* Login Card */}
-        <div className="bg-white rounded-2xl shadow-lg p-8">
+        <div className="bg-white rounded-2xl shadow-lg p-6 sm:p-8">
           <h2 className="text-2xl mb-6">Sign In</h2>
 
           {error && (
@@ -166,6 +166,13 @@ export function Login() {
                   required
                 />
               </div>
+            </div>
+
+            {/* Forgot Password Link */}
+            <div className="text-right">
+              <Link to="/forgot-password" className="text-sm text-blue-600 hover:underline">
+                Forgot password?
+              </Link>
             </div>
 
             {/* Submit Button */}

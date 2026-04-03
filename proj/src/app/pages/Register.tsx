@@ -180,7 +180,7 @@ export function Register() {
         </div>
 
         {/* Registration Card */}
-        <div className="bg-white rounded-2xl shadow-lg p-8">
+        <div className="bg-white rounded-2xl shadow-lg p-6 sm:p-8">
           <h2 className="text-2xl mb-6">Create Account</h2>
 
           <form onSubmit={handleSubmit} className="space-y-5">
