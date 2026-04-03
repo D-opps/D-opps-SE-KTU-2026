@@ -1,8 +1,4 @@
 from django.db import models
-<<<<<<< HEAD
-
-# Create your models here.
-=======
 from django.contrib.auth.models import AbstractUser
 import uuid
 
@@ -44,4 +40,10 @@ class Machine(models.Model):
 
     def __str__(self):
         return self.name
->>>>>>> 6d592b7d (Updated files models.py, serializers.py, urls.py)
+    
+class ProductPhoto(models.Model):
+    product = models.ForeignKey(Product, related_name='photos', on_delete=models.CASCADE)
+    image = models.ImageField(upload_to='products/')
+
+    def __str__(self):
+        return f"Photo for {self.product.title}"
