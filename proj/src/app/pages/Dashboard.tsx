@@ -1,6 +1,8 @@
 import { Link } from 'react-router';
-import { WashingMachine, ShoppingBag, MessageSquare, ArrowRight, Users, MessageCircle, Calendar } from 'lucide-react';
-import { machines, marketplaceItems, chatMessages } from '../data/mockData';
+import { 
+  WashingMachine, ShoppingBag, MessageSquare, ArrowRight, 
+  Users, MessageCircle, Activity, TrendingUp
+} from 'lucide-react';
 import { useState, useEffect } from 'react';
 import { OnboardingModal } from '../components/OnboardingModal';
 
@@ -16,264 +18,145 @@ interface Metrics {
   recentEvents: number;
 }
 
+// --- Interfaces ---
+interface StatItem { label: string; value: number; }
+interface MetricsResponse { stats: StatItem[]; }
+
 export function Dashboard() {
   const [userRole, setUserRole] = useState<string>('student');
   const [userName, setUserName] = useState<string>('User');
-  const [showOnboarding, setShowOnboarding] = useState(false);
-  const [metrics, setMetrics] = useState<Metrics | null>(null);
-  const [metricsLoading, setMetricsLoading] = useState(false);
+  const [metrics, setMetrics] = useState<MetricsResponse | null>(null);
   const [metricsPeriod, setMetricsPeriod] = useState(7);
+  const [loading, setLoading] = useState(true);
+
+  const token = localStorage.getItem('accessToken');
+
+  const fetchMetrics = async () => {
+    try {
+      if (localStorage.getItem('userRole') === 'admin') {
+        const response = await fetch(`http://127.0.0.1:8000/api/metrics/?period=${metricsPeriod}`, {
+          headers: { 'Authorization': `Bearer ${token}` }
+        });
+        if (response.ok) setMetrics(await response.json());
+      }
+    } catch (err) {
+      console.error("Failed to fetch metrics:", err);
+    } finally {
+      setLoading(false);
+    }
+  };
 
   useEffect(() => {
-    // Беремо дані з localStorage (вони там з'являться після логіну/реєстрації)
-    const role = localStorage.getItem('userRole') || 'student';
-    const name = localStorage.getItem('userName') || 'User';
-    setUserRole(role);
-    setUserName(name);
-
-    // Перевірка онбордингу
-    const hasSeenOnboarding = localStorage.getItem('hasSeenOnboarding');
-    if (!hasSeenOnboarding) {
-      setShowOnboarding(true);
-    }
-
-    if (role === 'admin') {
-      loadMetrics();
-    }
-  }, []);
-
-  // Оновлюємо метрики при зміні періоду
-  useEffect(() => {
-    if (userRole === 'admin') {
-      loadMetrics();
-    }
+    setUserRole(localStorage.getItem('userRole') || 'student');
+    setUserName(localStorage.getItem('userName') || 'User');
+    fetchMetrics();
   }, [metricsPeriod]);
 
-  // ФУНКЦІЯ ЗАПИТУ ДО DJANGO
-  const loadMetrics = async () => {
-    try {
-      setMetricsLoading(true);
-      // Замініть URL на ваш реальний ендпоінт в Django
-      const response = await fetch(`http://127.0.0.1:8000/api/metrics/?period=${metricsPeriod}`);
-      
-      if (response.ok) {
-        const data = await response.json();
-        setMetrics(data);
-      } else {
-        console.warn('Metrics endpoint not found or error. Using null.');
-        setMetrics(null);
-      }
-    } catch (error) {
-      console.error('Error connecting to Django:', error);
-      setMetrics(null);
-    } finally {
-      setMetricsLoading(false);
-    }
-  };
-
-  const handleOnboardingComplete = () => {
-    localStorage.setItem('hasSeenOnboarding', 'true');
-    setShowOnboarding(false);
-  };
-
-  const handleOnboardingSkip = () => {
-    localStorage.setItem('hasSeenOnboarding', 'true');
-    setShowOnboarding(false);
-  };
-
-  // Розрахунок даних з моків (тимчасово)
-  const availableMachines = machines.filter((m) => m.status === 'available').length;
-  const recentItems = marketplaceItems.slice(0, 3);
-  const recentMessages = chatMessages.filter((m) => m.room === 'general').slice(-3);
-
-  const getRoleGreeting = () => {
-    switch (userRole) {
-      case 'admin': return 'Admin Dashboard';
-      case 'doorkeeper': return 'Doorkeeper Dashboard';
-      default: return 'Student Dashboard';
-    }
-  };
-
   return (
-    <div className="p-4 lg:p-8 max-w-7xl mx-auto">
-      {/* Onboarding Modal */}
-      {showOnboarding && (
-        <OnboardingModal
-          onComplete={handleOnboardingComplete}
-          onSkip={handleOnboardingSkip}
-        />
-      )}
-
-      {/* Header */}
-      <div className="mb-8">
-        <h1 className="text-3xl font-bold mb-2">Welcome back, {userName}!</h1>
-        <p className="text-gray-600">{getRoleGreeting()}</p>
-        {userRole !== 'admin' && (
-          <button
-            onClick={() => setShowOnboarding(true)}
-            className="mt-2 text-sm text-blue-600 hover:underline"
+    <div className="p-6 lg:p-10 max-w-7xl mx-auto bg-[#f8fafc] min-h-screen">
+      
+      {/* Header Section */}
+      <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-10 gap-4">
+        <div>
+          <h1 className="text-4xl font-extrabold text-slate-900 tracking-tight">Welcome back, {userName}!</h1>
+          <p className="text-slate-500 font-medium mt-1 flex items-center gap-2">
+            <Activity size={16} className="text-blue-500" />
+            {userRole === 'admin' ? 'Administrator Portal' : 'Student Dashboard'} • Dormitory #1
+          </p>
+        </div>
+        
+        <div className="flex items-center bg-white p-1 rounded-2xl shadow-sm border border-slate-200">
+          <select 
+            value={metricsPeriod}
+            onChange={(e) => setMetricsPeriod(Number(e.target.value))}
+            className="px-4 py-2 bg-slate-900 text-white rounded-xl text-sm font-bold outline-none cursor-pointer hover:bg-slate-800 transition-colors"
           >
-            View tutorial again
-          </button>
-        )}
+            <option value={7}>Last 7 Days</option>
+            <option value={30}>Last 30 Days</option>
+            <option value={90}>Last 90 Days</option>
+          </select>
+        </div>
       </div>
 
-      {/* Admin Metrics Section */}
-      {userRole === 'admin' && (
-        <div className="mb-8">
-          <div className="flex items-center justify-between mb-4">
-            <h2 className="text-2xl font-bold text-gray-900">System Metrics</h2>
-            <select
-              value={metricsPeriod}
-              onChange={(e) => setMetricsPeriod(Number(e.target.value))}
-              className="px-4 py-2 border border-gray-300 rounded-lg focus:outline-none"
-            >
-              <option value={7}>Last 7 days</option>
-              <option value={30}>Last 30 days</option>
-              <option value={90}>Last 90 days</option>
-            </select>
-          </div>
-
-          {metricsLoading ? (
-            <div className="text-center py-8">
-              <div className="inline-block w-8 h-8 border-4 border-blue-600 border-t-transparent rounded-full animate-spin"></div>
-            </div>
-          ) : metrics ? (
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
-              <div className="bg-white rounded-xl shadow-sm p-6 border border-gray-100">
-                <div className="flex items-center justify-between mb-2">
-                  <p className="text-sm text-gray-600">Total Users</p>
-                  <Users className="w-5 h-5 text-blue-600" />
-                </div>
-                <p className="text-3xl font-bold text-gray-900">{metrics.totalUsers}</p>
-                <p className="text-sm text-green-600 mt-1">{metrics.verifiedUsers} verified</p>
+      {/* Top Metrics Grid (System Stats) */}
+      {userRole === 'admin' && metrics && (
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-10">
+          {metrics.stats.map((stat, i) => (
+            <div key={i} className="bg-white p-8 rounded-[2.5rem] border border-slate-100 shadow-sm relative overflow-hidden group hover:shadow-md transition-all">
+              <div className="absolute top-0 right-0 p-6 opacity-5 group-hover:scale-110 transition-transform">
+                {i === 0 ? <Users size={90} /> : i === 1 ? <ShoppingBag size={90} /> : <MessageCircle size={90} />}
               </div>
-
-              <div className="bg-white rounded-xl shadow-sm p-6 border border-gray-100">
-                <div className="flex items-center justify-between mb-2">
-                  <p className="text-sm text-gray-600">Messages</p>
-                  <MessageCircle className="w-5 h-5 text-purple-600" />
-                </div>
-                <p className="text-3xl font-bold text-gray-900">{metrics.totalMessages}</p>
-                <p className="text-sm text-blue-600 mt-1">+{metrics.recentMessages} recent</p>
-              </div>
-
-              <div className="bg-white rounded-xl shadow-sm p-6 border border-gray-100">
-                <div className="flex items-center justify-between mb-2">
-                  <p className="text-sm text-gray-600">Listings</p>
-                  <ShoppingBag className="w-5 h-5 text-green-600" />
-                </div>
-                <p className="text-3xl font-bold text-gray-900">{metrics.totalListings}</p>
-                <p className="text-sm text-orange-600 mt-1">{metrics.activeListings} active</p>
-              </div>
-
-              <div className="bg-white rounded-xl shadow-sm p-6 border border-gray-100">
-                <div className="flex items-center justify-between mb-2">
-                  <p className="text-sm text-gray-600">Events</p>
-                  <Calendar className="w-5 h-5 text-pink-600" />
-                </div>
-                <p className="text-3xl font-bold text-gray-900">{metrics.totalEvents}</p>
-                <p className="text-sm text-blue-600 mt-1">+{metrics.recentEvents} recent</p>
+              
+              {/* Force English Labels for Stats */}
+              <p className="text-xs font-black text-slate-400 uppercase tracking-[0.2em]">
+                {i === 0 ? 'Total Students' : i === 1 ? 'Active Ads' : 'Daily Messages'}
+              </p>
+              
+              <div className="flex items-end gap-3 mt-3">
+                <h3 className="text-5xl font-black text-slate-900">{stat.value}</h3>
+                <span className="text-green-500 font-bold text-sm mb-2 flex items-center gap-1">
+                  <TrendingUp size={16} /> Live
+                </span>
               </div>
             </div>
-          ) : (
-            <div className="p-4 bg-yellow-50 text-yellow-700 rounded-lg">
-              Metrics API not connected. Please check your Django backend.
-            </div>
-          )}
+          ))}
         </div>
       )}
 
-      {/* Stats Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
-        <Link to="/laundry" className="bg-white rounded-2xl p-6 shadow-sm hover:shadow-md border border-gray-100">
-          <div className="flex items-center gap-4 mb-4">
-            <div className="w-12 h-12 bg-green-100 rounded-lg flex items-center justify-center">
-              <WashingMachine className="w-6 h-6 text-green-600" />
+      {/* Main Navigation Cards (Bento Style) */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+        
+        {/* Laundry Card */}
+        <Link to="/laundry" className="group relative bg-gradient-to-br from-emerald-500 to-teal-600 p-8 rounded-[2.5rem] shadow-xl shadow-emerald-200/40 hover:-translate-y-2 transition-all duration-300 overflow-hidden">
+          <div className="relative z-10 text-white">
+            <div className="w-14 h-14 bg-white/20 backdrop-blur-md rounded-2xl flex items-center justify-center mb-6">
+              <WashingMachine className="text-white" size={32} />
             </div>
-            <div>
-              <p className="text-sm text-gray-600">Available Machines</p>
-              <p className="text-2xl font-bold text-green-600">{availableMachines}</p>
+            <h3 className="text-2xl font-bold mb-2">Laundry Room</h3>
+            <p className="text-emerald-50/80 text-sm font-medium mb-8 leading-relaxed">
+              Check machine status and book your slot instantly.
+            </p>
+            <div className="flex items-center gap-2 font-bold text-sm bg-white/20 w-fit px-5 py-2.5 rounded-full backdrop-blur-sm border border-white/10 group-hover:bg-white group-hover:text-emerald-600 transition-all">
+              Check Status <ArrowRight size={16} />
             </div>
           </div>
-          <div className="flex items-center justify-between text-sm text-gray-500">
-            <span>Check laundry status</span>
-            <ArrowRight className="w-4 h-4" />
-          </div>
+          <WashingMachine className="absolute -bottom-10 -right-10 text-white/10 rotate-12" size={240} />
         </Link>
 
-        <Link to="/marketplace" className="bg-white rounded-2xl p-6 shadow-sm hover:shadow-md border border-gray-100">
-          <div className="flex items-center gap-4 mb-4">
-            <div className="w-12 h-12 bg-blue-100 rounded-lg flex items-center justify-center">
-              <ShoppingBag className="w-6 h-6 text-blue-600" />
+        {/* Marketplace Card */}
+        <Link to="/marketplace" className="group relative bg-gradient-to-br from-blue-500 to-indigo-600 p-8 rounded-[2.5rem] shadow-xl shadow-blue-200/40 hover:-translate-y-2 transition-all duration-300 overflow-hidden">
+          <div className="relative z-10 text-white">
+            <div className="w-14 h-14 bg-white/20 backdrop-blur-md rounded-2xl flex items-center justify-center mb-6">
+              <ShoppingBag className="text-white" size={32} />
             </div>
-            <div>
-              <p className="text-sm text-gray-600">New Items</p>
-              <p className="text-2xl font-bold text-blue-600">{marketplaceItems.length}</p>
+            <h3 className="text-2xl font-bold mb-2">Marketplace</h3>
+            <p className="text-blue-50/80 text-sm font-medium mb-8 leading-relaxed">
+              Find deals or sell items to your dorm community.
+            </p>
+            <div className="flex items-center gap-2 font-bold text-sm bg-white/20 w-fit px-5 py-2.5 rounded-full backdrop-blur-sm border border-white/10 group-hover:bg-white group-hover:text-blue-600 transition-all">
+              Explore Shop <ArrowRight size={16} />
             </div>
           </div>
-          <div className="flex items-center justify-between text-sm text-gray-500">
-            <span>Browse marketplace</span>
-            <ArrowRight className="w-4 h-4" />
-          </div>
+          <ShoppingBag className="absolute -bottom-10 -right-10 text-white/10 rotate-12" size={240} />
         </Link>
 
-        <Link to="/chat" className="bg-white rounded-2xl p-6 shadow-sm hover:shadow-md border border-gray-100">
-          <div className="flex items-center gap-4 mb-4">
-            <div className="w-12 h-12 bg-purple-100 rounded-lg flex items-center justify-center">
-              <MessageSquare className="w-6 h-6 text-purple-600" />
+        {/* Chat Card */}
+        <Link to="/chat" className="group relative bg-gradient-to-br from-purple-500 to-fuchsia-600 p-8 rounded-[2.5rem] shadow-xl shadow-purple-200/40 hover:-translate-y-2 transition-all duration-300 overflow-hidden">
+          <div className="relative z-10 text-white">
+            <div className="w-14 h-14 bg-white/20 backdrop-blur-md rounded-2xl flex items-center justify-center mb-6">
+              <MessageSquare className="text-white" size={32} />
             </div>
-            <div>
-              <p className="text-sm text-gray-600">Community Chat</p>
-              <p className="text-2xl font-bold text-purple-600">Active</p>
+            <h3 className="text-2xl font-bold mb-2">Dorm Chat</h3>
+            <p className="text-purple-50/80 text-sm font-medium mb-8 leading-relaxed">
+              Chat with residents and stay up to date.
+            </p>
+            <div className="flex items-center gap-2 font-bold text-sm bg-white/20 w-fit px-5 py-2.5 rounded-full backdrop-blur-sm border border-white/10 group-hover:bg-white group-hover:text-purple-600 transition-all">
+              Open Chat <ArrowRight size={16} />
             </div>
           </div>
-          <div className="flex items-center justify-between text-sm text-gray-500">
-            <span>Open chat</span>
-            <ArrowRight className="w-4 h-4" />
-          </div>
+          <MessageSquare className="absolute -bottom-10 -right-10 text-white/10 rotate-12" size={240} />
         </Link>
-      </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        <div className="bg-white rounded-2xl p-6 shadow-sm border border-gray-100">
-          <div className="flex items-center justify-between mb-4">
-            <h2 className="text-xl font-bold">Latest Marketplace</h2>
-            <Link to="/marketplace" className="text-sm text-blue-600 hover:underline">View all</Link>
-          </div>
-          <div className="space-y-4">
-            {recentItems.map((item) => (
-              <Link key={item.id} to={`/marketplace/${item.id}`} className="flex gap-4 p-3 rounded-lg hover:bg-gray-50">
-                <img src={item.image} alt={item.name} className="w-16 h-16 rounded-lg object-cover" />
-                <div className="flex-1">
-                  <h3 className="font-medium">{item.name}</h3>
-                  <p className="text-sm text-gray-600">{item.seller}</p>
-                </div>
-                <div className="text-blue-600 font-bold">${item.price}</div>
-              </Link>
-            ))}
-          </div>
-        </div>
-
-        <div className="bg-white rounded-2xl p-6 shadow-sm border border-gray-100">
-          <div className="flex items-center justify-between mb-4">
-            <h2 className="text-xl font-bold">Recent Messages</h2>
-            <Link to="/chat" className="text-sm text-blue-600 hover:underline">View all</Link>
-          </div>
-          <div className="space-y-4">
-            {recentMessages.map((msg) => (
-              <div key={msg.id} className="p-3 rounded-lg bg-gray-50">
-                <div className="flex items-center justify-between mb-1">
-                  <span className="text-sm font-medium">{msg.sender}</span>
-                  <span className="text-xs text-gray-500">
-                    {msg.timestamp.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })}
-                  </span>
-                </div>
-                <p className="text-sm text-gray-600 line-clamp-2">{msg.message}</p>
-              </div>
-            ))}
-          </div>
-        </div>
       </div>
     </div>
   );

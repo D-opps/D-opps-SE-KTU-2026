@@ -36,8 +36,9 @@ export const router = createBrowserRouter([
       { path: "laundry", Component: Laundry },
       { path: "marketplace", Component: Marketplace },
       { path: "marketplace/:itemId", Component: ItemDetails },
-      { path: "chat", Component: Chat },
-      { path: "profile", Component: Profile },
+      { path: "chat", Component: Chat },           // Відкриє список чатів
+      { path: "chat/:chatId", Component: Chat },    // Відкриє конкретний чат за ID
+      { path: "profile", Component: Profile },
     ],
   },
 ]);

@@ -1,346 +1,236 @@
-import { Mail, MapPin, Package, X, Building2, Camera, Check } from 'lucide-react';
-import { marketplaceItems } from '../data/mockData';
+import { Mail, MapPin, Package, X, Building2, Camera, Loader2 } from 'lucide-react';
 import { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router';
-
-// Simple password hashing function
-async function hashPassword(password: string): Promise<string> {
-  const encoder = new TextEncoder();
-  const data = encoder.encode(password);
-  const hashBuffer = await crypto.subtle.digest('SHA-256', data);
-  const hashArray = Array.from(new Uint8Array(hashBuffer));
-  const hashHex = hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
-  return hashHex;
-}
+import axios from 'axios';
+import { toast } from 'sonner';
 
 export function Profile() {
   const navigate = useNavigate();
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const [user, setUser] = useState({
-    name: 'Alex Johnson',
-    email: 'alex.johnson@university.edu',
-    room: 'Room 305',
-    dormitory: '1',
-    initials: 'AJ',
-    role: 'student',
-    photo: '',
-  });
+  
+  // Дані користувача з сервера
+  const [profileData, setProfileData] = useState<any>(null);
+  const [myProducts, setMyProducts] = useState([]);
+  const [loading, setLoading] = useState(true);
 
+  // Стан модалки та форми
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
+  const [updating, setUpdating] = useState(false);
   const [editForm, setEditForm] = useState({
     name: '',
-    email: '',
     room: '',
-    dormitory: '1',
-    photo: '',
-    currentPassword: '',
-    newPassword: '',
-    confirmNewPassword: '',
+    dormitory: '',
   });
-  const [editErrors, setEditErrors] = useState<Record<string, string>>({});
 
   const dormitories = ['1', '2', '3', '4', '5', '6', '7', '8'];
 
-  // Predefined avatar options
-  const avatarOptions = [
-    'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=400&h=400&fit=crop',
-    'https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=400&h=400&fit=crop',
-    'https://images.unsplash.com/photo-1599566150163-29194dcaad36?w=400&h=400&fit=crop',
-    'https://images.unsplash.com/photo-1438761681033-6461ffad8d80?w=400&h=400&fit=crop',
-    'https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?w=400&h=400&fit=crop',
-    'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=400&h=400&fit=crop',
-  ];
+ const fetchProfile = async () => {
+    try {
+      const token = localStorage.getItem('accessToken');
+      if (!token) {
+        navigate('/login');
+        return;
+      }
+      
+      const headers = { Authorization: `Bearer ${token}` };
 
-  useEffect(() => {
-    // Get user data from localStorage
-    const name = localStorage.getItem('userName') || 'Alex Johnson';
-    const email = localStorage.getItem('userEmail') || 'alex.johnson@university.edu';
-    const room = localStorage.getItem('userRoom') || 'Room 305';
-    const dormitory = localStorage.getItem('userDormitory') || '1';
-    const role = localStorage.getItem('userRole') || 'student';
-    const photo = localStorage.getItem('userPhoto') || '';
-    
-    // Generate initials from name
-    const initials = name
-      .split(' ')
-      .map((n) => n.charAt(0).toUpperCase())
-      .join('')
-      .slice(0, 2);
+      // 1. Отримуємо дані профілю
+      const profileRes = await axios.get('http://127.0.0.1:8000/api/profile/', { headers });
+      
+      // Дані юзера зазвичай лежать в profileRes.data.profile (перевір структуру в консолі)
+      const userData = profileRes.data.profile || profileRes.data; 
+      
+      // Додаємо повний шлях до фото, якщо бекенд шле відносний (/media/...)
+      if (userData.photo && !userData.photo.startsWith('http')) {
+        userData.photo = `http://127.0.0.1:8000${userData.photo}`;
+      }
+      
+      setProfileData(userData);
 
-    setUser({
-      name,
-      email,
-      room,
-      dormitory,
-      initials,
-      role,
-      photo,
-    });
-  }, []);
+      // ОНОВЛЮЄМО localStorage, щоб ім'я в хедері змінилося відразу після редагування
+      localStorage.setItem('userName', userData.first_name || 'User');
+      localStorage.setItem('userDormitory', userData.dormitory || '');
+      localStorage.setItem('userRoom', userData.room_number || '');
 
-  const openEditModal = () => {
-    setEditForm({
-      name: user.name,
-      email: user.email,
-      room: user.room,
-      dormitory: user.dormitory,
-      photo: user.photo,
-      currentPassword: '',
-      newPassword: '',
-      confirmNewPassword: '',
-    });
-    setEditErrors({});
-    setIsEditModalOpen(true);
-  };
-
-  const handleEditChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
-    const { name, value } = e.target;
-    setEditForm((prev) => ({ ...prev, [name]: value }));
-    // Clear error when user starts typing
-    if (editErrors[name]) {
-      setEditErrors((prev) => ({ ...prev, [name]: '' }));
-    }
-  };
-
-  const validatePassword = (password: string): { valid: boolean; errors: string[] } => {
-    const errors: string[] = [];
-    
-    if (password.length < 8) {
-      errors.push('At least 8 characters');
-    }
-    if (!/[A-Z]/.test(password)) {
-      errors.push('One uppercase letter');
-    }
-    if (!/[a-z]/.test(password)) {
-      errors.push('One lowercase letter');
-    }
-    if (!/[0-9]/.test(password)) {
-      errors.push('One number');
-    }
-    if (!/[^A-Za-z0-9]/.test(password)) {
-      errors.push('One special character');
-    }
-
-    return { valid: errors.length === 0, errors };
-  };
-
-  const validateEditForm = async () => {
-    const newErrors: Record<string, string> = {};
-
-    if (!editForm.name.trim()) {
-      newErrors.name = 'Name is required';
-    }
-
-    if (!editForm.email.trim()) {
-      newErrors.email = 'Email is required';
-    } else if (!editForm.email.includes('@')) {
-      newErrors.email = 'Please enter a valid email';
-    }
-
-    if (user.role === 'student' && !editForm.room.trim()) {
-      newErrors.room = 'Room number is required';
-    }
-
-    // Password validation (only if user is trying to change password)
-    if (editForm.newPassword || editForm.confirmNewPassword) {
-      if (!editForm.currentPassword) {
-        newErrors.currentPassword = 'Current password is required to change password';
+      // 2. Отримуємо товари (Тут важливо фільтрувати правильно)
+      if (profileRes.data.products) {
+        setMyProducts(profileRes.data.products);
       } else {
-        // Verify current password
-        const users = JSON.parse(localStorage.getItem('registeredUsers') || '[]');
-        const hashedCurrentPassword = await hashPassword(editForm.currentPassword);
-        const currentUser = users.find((u: any) => u.email === user.email);
+        const productsRes = await axios.get('http://127.0.0.1:8000/api/products/', { headers });
         
-        if (!currentUser || currentUser.password !== hashedCurrentPassword) {
-          newErrors.currentPassword = 'Current password is incorrect';
-        }
+        // Фільтруємо за ID або Email (дивлячись що повертає поле 'seller')
+        const myItems = productsRes.data.filter((item: any) => 
+          item.seller === userData.id || 
+          item.seller === userData.email ||
+          item.seller_email === userData.email // додано про всяк випадок
+        );
+        setMyProducts(myItems);
       }
 
-      const passwordValidation = validatePassword(editForm.newPassword);
-      if (!passwordValidation.valid) {
-        newErrors.newPassword = 'Password does not meet requirements';
+      // 3. Синхронізуємо форму редагування
+      setEditForm({
+        name: userData.first_name || '',
+        room: userData.room_number || '',
+        dormitory: userData.dormitory?.toString() || '',
+      });
+
+    } catch (err: any) {
+      console.error("Error fetching data:", err);
+      if (err.response?.status === 401) {
+        toast.error("Session expired. Please login again.");
+        navigate('/login');
+      } else {
+        toast.error("Failed to load profile data");
       }
-      if (editForm.newPassword !== editForm.confirmNewPassword) {
-        newErrors.confirmNewPassword = 'Passwords do not match';
-      }
+    } finally {
+      setLoading(false);
     }
-
-    setEditErrors(newErrors);
-    return Object.keys(newErrors).length === 0;
   };
 
-  const handleSaveProfile = async (e: React.FormEvent) => {
-    e.preventDefault();
+  useEffect(() => { fetchProfile(); }, []);
 
-    if (!(await validateEditForm())) {
-      return;
-    }
+  // 2. Збереження змін
+  // src/pages/Profile.tsx
 
-    // Update in registeredUsers
-    const users = JSON.parse(localStorage.getItem('registeredUsers') || '[]');
-    const userIndex = users.findIndex((u: any) => u.email === user.email);
-    
-    if (userIndex !== -1) {
-      users[userIndex].fullName = editForm.name;
-      users[userIndex].email = editForm.email;
-      users[userIndex].dormitory = editForm.dormitory;
-      users[userIndex].roomNumber = editForm.room;
-      users[userIndex].photo = editForm.photo;
-      
-      // Update password if changed
-      if (editForm.newPassword) {
-        users[userIndex].password = await hashPassword(editForm.newPassword);
+const handleSaveProfile = async (e: React.FormEvent) => {
+  e.preventDefault();
+  setUpdating(true);
+  
+  const token = localStorage.getItem('accessToken');
+  const formData = new FormData();
+  
+  // Надсилаємо поля, які очікує UserSerializer
+  formData.append('first_name', editForm.name);
+  formData.append('room_number', editForm.room);
+  
+  // Важливо: переконайся, що dormitory — це число або валідна строка
+  if (editForm.dormitory) {
+    formData.append('dormitory', editForm.dormitory);
+  }
+  
+  if (fileInputRef.current?.files?.[0]) {
+    formData.append('photo', fileInputRef.current.files[0]);
+  }
+
+  try {
+    const response = await axios.patch('http://127.0.0.1:8000/api/profile/', formData, {
+      headers: { 
+        'Authorization': `Bearer ${token}`,
+        'Content-Type': 'multipart/form-data'
       }
-      
-      localStorage.setItem('registeredUsers', JSON.stringify(users));
-    }
-
-    // Update current session localStorage
-    localStorage.setItem('userName', editForm.name);
-    localStorage.setItem('userEmail', editForm.email);
-    localStorage.setItem('userDormitory', editForm.dormitory);
-    localStorage.setItem('userPhoto', editForm.photo);
-    if (user.role === 'student') {
-      localStorage.setItem('userRoom', editForm.room);
-    }
-
-    // Update state
-    const initials = editForm.name
-      .split(' ')
-      .map((n) => n.charAt(0).toUpperCase())
-      .join('')
-      .slice(0, 2);
-
-    setUser({
-      ...user,
-      name: editForm.name,
-      email: editForm.email,
-      room: editForm.room,
-      dormitory: editForm.dormitory,
-      photo: editForm.photo,
-      initials,
     });
+
+    toast.success("Profile updated successfully!");
+    
+    // Оновлюємо дані в стейті та localStorage, щоб зміни з'явилися всюди відразу
+    const updatedUser = response.data.profile;
+    setProfileData(updatedUser);
+    localStorage.setItem('userName', updatedUser.first_name);
+    localStorage.setItem('userDormitory', updatedUser.dormitory);
+    localStorage.setItem('userRoom', updatedUser.room_number);
 
     setIsEditModalOpen(false);
-  };
-
-  // Items posted by the current user
-  const userItems = marketplaceItems.filter(
-    (item) => item.seller === user.name
-  );
+  } catch (err: any) {
+    console.error("Update error:", err.response?.data);
+    toast.error("Failed to update: " + JSON.stringify(err.response?.data));
+  } finally {
+    setUpdating(false);
+  }
+};
+  if (loading) return <div className="flex justify-center p-20 text-blue-600"><Loader2 className="animate-spin w-10 h-10" /></div>;
 
   return (
     <div className="p-4 lg:p-8 max-w-7xl mx-auto">
-      {/* Header */}
       <div className="mb-8">
-        <h1 className="text-3xl mb-2">Profile</h1>
-        <p className="text-gray-600">Manage your account and listings</p>
+        <h1 className="text-3xl font-bold text-gray-900">My Profile</h1>
+        <p className="text-gray-600">Manage your dormitory life and marketplace activity</p>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* Profile Card */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+        {/* Left Side: Profile Card */}
         <div className="lg:col-span-1">
-          <div className="bg-white rounded-2xl p-6 shadow-sm border border-gray-100">
-            {/* Profile Picture */}
-            <div className="flex flex-col items-center mb-6">
-              <div className="w-24 h-24 bg-blue-600 text-white rounded-full flex items-center justify-center text-3xl mb-4">
-                {user.initials}
-              </div>
-              <h2 className="text-2xl mb-1">{user.name}</h2>
-              <p className="text-gray-600 capitalize">{user.role}</p>
+          <div className="bg-white rounded-3xl p-8 shadow-sm border border-gray-100 flex flex-col items-center">
+            <div className="relative mb-6">
+              <img 
+                src={profileData.photo ? `http://127.0.0.1:8000${profileData.photo}` : `https://ui-avatars.com/api/?name=${profileData.first_name}&background=0D8ABC&color=fff`}
+                className="w-32 h-32 rounded-3xl object-cover shadow-inner bg-gray-50 border-4 border-white"
+                alt="Profile"
+              />
+              <div className="absolute -bottom-2 -right-2 bg-green-500 w-6 h-6 rounded-full border-4 border-white shadow-sm" title="Online"></div>
             </div>
+            
+            <h2 className="text-2xl font-bold text-gray-900 mb-1">{profileData.first_name}</h2>
+            <span className="px-3 py-1 bg-blue-50 text-blue-600 text-xs font-bold rounded-full uppercase tracking-wider mb-6">
+              {profileData.role}
+            </span>
 
-            {/* Profile Info */}
-            <div className="space-y-4">
-              <div className="flex items-center gap-3 text-gray-600">
-                <Mail className="w-5 h-5" />
-                <span className="text-sm break-all">{user.email}</span>
-              </div>
-              {user.role === 'student' && user.room && (
-                <div className="flex items-center gap-3 text-gray-600">
-                  <MapPin className="w-5 h-5" />
-                  <span className="text-sm">{user.room}</span>
+            <div className="w-full space-y-4 border-t pt-6">
+              <div className="flex items-center gap-4 text-gray-600">
+                <div className="w-10 h-10 rounded-xl bg-gray-50 flex items-center justify-center"><Mail size={18} /></div>
+                <div className="flex flex-col">
+                  <span className="text-[10px] uppercase font-bold text-gray-400">Email</span>
+                  <span className="text-sm font-medium">{profileData.email}</span>
                 </div>
-              )}
+              </div>
+              <div className="flex items-center gap-4 text-gray-600">
+                <div className="w-10 h-10 rounded-xl bg-gray-50 flex items-center justify-center"><Building2 size={18} /></div>
+                <div className="flex flex-col">
+                  <span className="text-[10px] uppercase font-bold text-gray-400">Dormitory</span>
+                  <span className="text-sm font-medium">#{profileData.dormitory || '—'}</span>
+                </div>
+              </div>
+              <div className="flex items-center gap-4 text-gray-600">
+                <div className="w-10 h-10 rounded-xl bg-gray-50 flex items-center justify-center"><MapPin size={18} /></div>
+                <div className="flex flex-col">
+                  <span className="text-[10px] uppercase font-bold text-gray-400">Room</span>
+                  <span className="text-sm font-medium">{profileData.room_number || '—'}</span>
+                </div>
+              </div>
             </div>
 
-            {/* Edit Profile Button */}
             <button
-              onClick={openEditModal}
-              className="w-full mt-6 px-4 py-3 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
+              onClick={() => setIsEditModalOpen(true)}
+              className="w-full mt-8 px-4 py-3 bg-gray-900 text-white rounded-2xl hover:bg-black transition-all font-semibold shadow-lg shadow-gray-200"
             >
-              Edit Profile
+              Edit Settings
             </button>
           </div>
         </div>
 
-        {/* Activity Section */}
-        <div className="lg:col-span-2 space-y-6">
-          {/* Statistics */}
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-            <div className="bg-white rounded-xl p-4 shadow-sm border border-gray-100">
-              <div className="text-sm text-gray-600 mb-1">Items Listed</div>
-              <div className="text-2xl text-blue-600">{userItems.length}</div>
-            </div>
-            <div className="bg-white rounded-xl p-4 shadow-sm border border-gray-100">
-              <div className="text-sm text-gray-600 mb-1">Total Views</div>
-              <div className="text-2xl text-blue-600">127</div>
-            </div>
-            <div className="bg-white rounded-xl p-4 shadow-sm border border-gray-100">
-              <div className="text-sm text-gray-600 mb-1">Messages</div>
-              <div className="text-2xl text-blue-600">8</div>
-            </div>
-          </div>
-
-          {/* Listed Items */}
-          <div className="bg-white rounded-2xl p-6 shadow-sm border border-gray-100">
-            <div className="flex items-center gap-2 mb-6">
-              <Package className="w-5 h-5 text-gray-600" />
-              <h2 className="text-xl">Your Listings</h2>
+        {/* Right Side: My Listings */}
+        <div className="lg:col-span-2">
+          <div className="bg-white rounded-3xl p-8 shadow-sm border border-gray-100 min-h-[400px]">
+            <div className="flex items-center justify-between mb-8">
+              <div className="flex items-center gap-3">
+                <Package className="w-6 h-6 text-blue-600" />
+                <h2 className="text-2xl font-bold text-gray-900">Your Listings</h2>
+              </div>
+              <span className="text-sm font-bold text-gray-400 bg-gray-50 px-4 py-1 rounded-full">
+                {myProducts.length} Items
+              </span>
             </div>
 
-            {userItems.length > 0 ? (
-              <div className="space-y-4">
-                {userItems.map((item) => (
-                  <div
-                    key={item.id}
-                    className="flex gap-4 p-4 rounded-lg border border-gray-200 hover:border-blue-200 transition-colors"
-                  >
-                    <img
-                      src={item.image}
-                      alt={item.name}
-                      className="w-20 h-20 rounded-lg object-cover"
-                    />
-                    <div className="flex-1">
-                      <div className="flex items-start justify-between mb-1">
-                        <h3 className="text-lg">{item.name}</h3>
-                        <span className="text-lg text-blue-600">${item.price}</span>
-                      </div>
-                      <p className="text-sm text-gray-600 mb-2 line-clamp-2">
-                        {item.description}
-                      </p>
-                      <span className="text-xs bg-gray-100 text-gray-600 px-2 py-1 rounded-full">
-                        {item.category}
-                      </span>
+            {myProducts.length > 0 ? (
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                {myProducts.map((item: any) => (
+                  <div key={item.id} className="group relative bg-white border border-gray-100 rounded-2xl overflow-hidden hover:shadow-xl transition-all duration-300">
+                    <img src={`http://127.0.0.1:8000${item.image}`} className="w-full h-40 object-cover group-hover:scale-105 transition-transform duration-500" />
+                    <div className="p-4">
+                      <h3 className="font-bold text-gray-900">{item.title}</h3>
+                      <p className="text-blue-600 font-bold">${item.price}</p>
                     </div>
                   </div>
                 ))}
               </div>
             ) : (
-              <div className="text-center py-8 text-gray-500">
-                <Package className="w-12 h-12 mx-auto mb-3 text-gray-300" />
-                <p>You haven't listed any items yet.</p>
-                <button
-                  onClick={() => {
-                    navigate('/marketplace');
-                    setTimeout(() => {
-                      const addButton = document.querySelector('[data-add-product]') as HTMLButtonElement;
-                      addButton?.click();
-                    }, 100);
-                  }}
-                  className="mt-4 px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+              <div className="flex flex-col items-center justify-center h-64 text-gray-400">
+                <Package size={48} className="mb-4 opacity-20" />
+                <p className="font-medium text-lg">No listings yet</p>
+                <button 
+                  onClick={() => navigate('/marketplace')}
+                  className="mt-4 text-blue-600 font-bold hover:underline"
                 >
-                  Create Listing
+                  Create your first listing →
                 </button>
               </div>
             )}
@@ -348,260 +238,77 @@ export function Profile() {
         </div>
       </div>
 
-      {/* Edit Profile Modal */}
+      {/* EDIT MODAL - Скляний ефект */}
       {isEditModalOpen && (
-        <div className="fixed inset-0 backdrop-blur-sm bg-black bg-opacity-30 flex items-center justify-center p-4 z-50">
-          <div className="bg-white rounded-2xl p-6 max-w-md w-full max-h-[90vh] overflow-y-auto shadow-2xl">
-            {/* Modal Header */}
-            <div className="flex items-center justify-between mb-6">
-              <h2 className="text-2xl">Edit Profile</h2>
-              <button
-                onClick={() => setIsEditModalOpen(false)}
-                className="text-gray-400 hover:text-gray-600 transition-colors"
-              >
-                <X className="w-6 h-6" />
-              </button>
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+          <div 
+            className="absolute inset-0 bg-black/40 backdrop-blur-md transition-opacity" 
+            onClick={() => setIsEditModalOpen(false)}
+          ></div>
+          
+          <div className="relative bg-white w-full max-w-md rounded-[2.5rem] shadow-2xl p-8 animate-in fade-in zoom-in duration-300">
+            <div className="flex items-center justify-between mb-8">
+              <h2 className="text-2xl font-bold text-gray-900">Edit Profile</h2>
+              <button onClick={() => setIsEditModalOpen(false)} className="p-2 hover:bg-gray-100 rounded-full transition-colors"><X size={20}/></button>
             </div>
 
-            {/* Edit Form */}
-            <form onSubmit={handleSaveProfile} className="space-y-4">
-              {/* Name */}
+            <form onSubmit={handleSaveProfile} className="space-y-5">
+              {/* Photo Upload Area */}
+              <div className="flex justify-center mb-8">
+                <div 
+                  className="relative group cursor-pointer" 
+                  onClick={() => fileInputRef.current?.click()}
+                >
+                  <div className="absolute inset-0 bg-black/20 rounded-3xl opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center z-10">
+                    <Camera className="text-white" size={32} />
+                  </div>
+                  <img 
+                    src={profileData.photo ? `http://127.0.0.1:8000${profileData.photo}` : 'https://via.placeholder.com/150'} 
+                    className="w-28 h-28 rounded-3xl object-cover border-4 border-blue-50"
+                  />
+                  <input type="file" ref={fileInputRef} className="hidden" accept="image/*" />
+                </div>
+              </div>
+
               <div>
-                <label htmlFor="edit-name" className="block text-sm mb-2 text-gray-700">
-                  Full Name
-                </label>
+                <label className="block text-xs font-bold text-gray-400 uppercase tracking-widest mb-2 ml-1">Full Name</label>
                 <input
-                  id="edit-name"
-                  name="name"
                   type="text"
                   value={editForm.name}
-                  onChange={handleEditChange}
-                  className={`w-full px-4 py-3 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 ${
-                    editErrors.name ? 'border-red-500' : 'border-gray-300'
-                  }`}
+                  onChange={(e) => setEditForm({...editForm, name: e.target.value})}
+                  className="w-full px-5 py-4 bg-gray-50 border-none rounded-2xl focus:ring-2 focus:ring-blue-500 transition-all outline-none font-medium"
                 />
-                {editErrors.name && (
-                  <p className="text-red-500 text-sm mt-1">{editErrors.name}</p>
-                )}
               </div>
 
-              {/* Email */}
-              <div>
-                <label htmlFor="edit-email" className="block text-sm mb-2 text-gray-700">
-                  Email
-                </label>
-                <input
-                  id="edit-email"
-                  name="email"
-                  type="email"
-                  value={editForm.email}
-                  onChange={handleEditChange}
-                  className={`w-full px-4 py-3 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 ${
-                    editErrors.email ? 'border-red-500' : 'border-gray-300'
-                  }`}
-                />
-                {editErrors.email && (
-                  <p className="text-red-500 text-sm mt-1">{editErrors.email}</p>
-                )}
-              </div>
-
-              {/* Room Number (only for students) */}
-              {user.role === 'student' && (
+              <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <label htmlFor="edit-room" className="block text-sm mb-2 text-gray-700">
-                    Room Number
-                  </label>
+                  <label className="block text-xs font-bold text-gray-400 uppercase tracking-widest mb-2 ml-1">Dormitory</label>
+                  <select
+                    value={editForm.dormitory}
+                    onChange={(e) => setEditForm({...editForm, dormitory: e.target.value})}
+                    className="w-full px-5 py-4 bg-gray-50 border-none rounded-2xl focus:ring-2 focus:ring-blue-500 outline-none font-medium"
+                  >
+                    {dormitories.map(d => <option key={d} value={d}>Dorm {d}</option>)}
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-xs font-bold text-gray-400 uppercase tracking-widest mb-2 ml-1">Room</label>
                   <input
-                    id="edit-room"
-                    name="room"
                     type="text"
                     value={editForm.room}
-                    onChange={handleEditChange}
-                    className={`w-full px-4 py-3 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 ${
-                      editErrors.room ? 'border-red-500' : 'border-gray-300'
-                    }`}
+                    onChange={(e) => setEditForm({...editForm, room: e.target.value})}
+                    className="w-full px-5 py-4 bg-gray-50 border-none rounded-2xl focus:ring-2 focus:ring-blue-500 outline-none font-medium"
                   />
-                  {editErrors.room && (
-                    <p className="text-red-500 text-sm mt-1">{editErrors.room}</p>
-                  )}
                 </div>
-              )}
-
-              {/* Dormitory (only for students) */}
-              {user.role === 'student' && (
-                <div>
-                  <label htmlFor="edit-dormitory" className="block text-sm mb-2 text-gray-700">
-                    Dormitory
-                  </label>
-                  <select
-                    id="edit-dormitory"
-                    name="dormitory"
-                    value={editForm.dormitory}
-                    onChange={handleEditChange}
-                    className={`w-full px-4 py-3 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 ${
-                      editErrors.dormitory ? 'border-red-500' : 'border-gray-300'
-                    }`}
-                  >
-                    {dormitories.map(dorm => (
-                      <option key={dorm} value={dorm}>
-                        Dormitory {dorm}
-                      </option>
-                    ))}
-                  </select>
-                  {editErrors.dormitory && (
-                    <p className="text-red-500 text-sm mt-1">{editErrors.dormitory}</p>
-                  )}
-                </div>
-              )}
-
-              {/* Photo */}
-              <div>
-                <label htmlFor="edit-photo" className="block text-sm mb-2 text-gray-700">
-                  Photo
-                </label>
-                <div className="relative">
-                  <input
-                    id="edit-photo"
-                    name="photo"
-                    type="text"
-                    value={editForm.photo}
-                    onChange={handleEditChange}
-                    className={`w-full px-4 py-3 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 ${
-                      editErrors.photo ? 'border-red-500' : 'border-gray-300'
-                    }`}
-                  />
-                  {editErrors.photo && (
-                    <p className="text-red-500 text-sm mt-1">{editErrors.photo}</p>
-                  )}
-                  <button
-                    type="button"
-                    onClick={() => fileInputRef.current?.click()}
-                    className="absolute right-3 top-3 text-gray-500 hover:text-gray-700 transition-colors"
-                  >
-                    <Camera className="w-5 h-5" />
-                  </button>
-                </div>
-                <input
-                  type="file"
-                  ref={fileInputRef}
-                  className="hidden"
-                  onChange={(e) => {
-                    const file = e.target.files?.[0];
-                    if (file) {
-                      const reader = new FileReader();
-                      reader.onloadend = () => {
-                        setEditForm((prev) => ({ ...prev, photo: reader.result as string }));
-                      };
-                      reader.readAsDataURL(file);
-                    }
-                  }}
-                />
-                {editForm.photo && (
-                  <div className="mt-2">
-                    <p className="text-sm text-gray-600 mb-2">Choose an avatar:</p>
-                    <div className="grid grid-cols-3 gap-2">
-                      {avatarOptions.map((avatar, index) => (
-                        <div key={index} className="relative">
-                          <img
-                            src={avatar}
-                            alt={`Avatar ${index + 1}`}
-                            className="w-10 h-10 rounded-full cursor-pointer"
-                            onClick={() => setEditForm((prev) => ({ ...prev, photo: avatar }))}
-                          />
-                          {editForm.photo === avatar && (
-                            <Check className="absolute top-0 right-0 w-4 h-4 text-green-500" />
-                          )}
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                )}
               </div>
 
-              {/* Divider */}
-              <div className="border-t pt-4">
-                <p className="text-sm text-gray-600 mb-4">Change Password (Optional)</p>
-              </div>
-
-              {/* Current Password */}
-              <div>
-                <label htmlFor="edit-current-password" className="block text-sm mb-2 text-gray-700">
-                  Current Password
-                </label>
-                <input
-                  id="edit-current-password"
-                  name="currentPassword"
-                  type="password"
-                  value={editForm.currentPassword}
-                  onChange={handleEditChange}
-                  placeholder="Enter current password"
-                  className={`w-full px-4 py-3 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 ${
-                    editErrors.currentPassword ? 'border-red-500' : 'border-gray-300'
-                  }`}
-                />
-                {editErrors.currentPassword && (
-                  <p className="text-red-500 text-sm mt-1">{editErrors.currentPassword}</p>
-                )}
-              </div>
-
-              {/* New Password */}
-              <div>
-                <label htmlFor="edit-new-password" className="block text-sm mb-2 text-gray-700">
-                  New Password
-                </label>
-                <input
-                  id="edit-new-password"
-                  name="newPassword"
-                  type="password"
-                  value={editForm.newPassword}
-                  onChange={handleEditChange}
-                  placeholder="Enter new password"
-                  className={`w-full px-4 py-3 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 ${
-                    editErrors.newPassword ? 'border-red-500' : 'border-gray-300'
-                  }`}
-                />
-                {editErrors.newPassword && (
-                  <p className="text-red-500 text-sm mt-1">{editErrors.newPassword}</p>
-                )}
-              </div>
-
-              {/* Confirm New Password */}
-              <div>
-                <label htmlFor="edit-confirm-password" className="block text-sm mb-2 text-gray-700">
-                  Confirm New Password
-                </label>
-                <input
-                  id="edit-confirm-password"
-                  name="confirmNewPassword"
-                  type="password"
-                  value={editForm.confirmNewPassword}
-                  onChange={handleEditChange}
-                  placeholder="Confirm new password"
-                  className={`w-full px-4 py-3 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 ${
-                    editErrors.confirmNewPassword ? 'border-red-500' : 'border-gray-300'
-                  }`}
-                />
-                {editErrors.confirmNewPassword && (
-                  <p className="text-red-500 text-sm mt-1">{editErrors.confirmNewPassword}</p>
-                )}
-              </div>
-
-              {/* Action Buttons */}
-              <div className="flex gap-3 pt-4">
-                <button
-                  type="button"
-                  onClick={() => setIsEditModalOpen(false)}
-                  className="flex-1 px-4 py-3 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
-                >
-                  Cancel
-                </button>
-                <button
-                  type="submit"
-                  className="flex-1 px-4 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
-                >
-                  Save Changes
-                </button>
-              </div>
+              <button
+                type="submit"
+                disabled={updating}
+                className="w-full bg-blue-600 text-white py-4 rounded-2xl font-bold mt-4 hover:bg-blue-700 transition-all disabled:opacity-50 flex justify-center gap-2 shadow-xl shadow-blue-100"
+              >
+                {updating ? <Loader2 className="animate-spin" /> : 'Apply Changes'}
+              </button>
             </form>
           </div>
         </div>
