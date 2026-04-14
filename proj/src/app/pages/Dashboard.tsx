@@ -4,6 +4,19 @@ import {
   Users, MessageCircle, Activity, TrendingUp
 } from 'lucide-react';
 import { useState, useEffect } from 'react';
+import { OnboardingModal } from '../components/OnboardingModal';
+
+// Типізація для метрик (якщо ви адмін)
+interface Metrics {
+  totalUsers: number;
+  verifiedUsers: number;
+  totalMessages: number;
+  recentMessages: number;
+  totalListings: number;
+  activeListings: number;
+  totalEvents: number;
+  recentEvents: number;
+}
 
 // --- Interfaces ---
 interface StatItem { label: string; value: number; }
