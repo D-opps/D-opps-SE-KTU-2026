@@ -3,51 +3,71 @@ from django.urls import path, include
 from django.conf import settings
 from django.conf.urls.static import static
 from rest_framework.routers import DefaultRouter
+from django.http import JsonResponse
 
-# Імпортуємо в'юшки
-from api.views import GoogleLoginView, MachineViewSet, ProductViewSet, RegisterView
+# Імпортуємо всі потрібні в'юшки
+from api.views import (
+    GoogleLoginView, 
+    MachineViewSet, 
+    ProductViewSet, 
+    RegisterView, 
+    UserProfileView,
+    ConversationViewSet,  # Додай цей імпорт!
+    MessageViewSet,  # Додай цей імпорт!
+    AdminDashboardView,  # Додай цей імпорт!
+    LatestProductsView,  # Додай цей імпорт!
+    RecentMessagesView  # Додай цей імпорт!
+)
 
-# Імпорти для JWT (логіну)
 from rest_framework_simplejwt.views import (
     TokenObtainPairView,
     TokenRefreshView,
 )
+def unread_count_stub(request):
+    return JsonResponse({'count': 0})
 
-# 1. Налаштування роутера для ViewSets
+def notifications_stub(request):
+    return JsonResponse([], safe=False)
+# Створюємо ОДИН роутер і реєструємо всі в'юсети
 router = DefaultRouter()
 router.register(r'machines', MachineViewSet)
 router.register(r'products', ProductViewSet)
+router.register(r'conversations', ConversationViewSet, basename='conversations')
+router.register(r'messages', MessageViewSet)
 
-# 2. Основні шляхи
 urlpatterns = [
     path('admin/', admin.site.urls),
     
-    # Головний блок API
     path('api/', include([
-        # Маршрути роутера (products, machines)
+        # Всі маршрути роутера (products, machines, conversations)
         path('', include(router.urls)),
         
-        # Реєстрація
+        # Реєстрація та Профіль
         path('register/', RegisterView.as_view(), name='register'),
+        path('profile/', UserProfileView.as_view(), name='profile'),
         
-        # Логін (отримання токена)
+        # Логін та Токени
         path('token/', TokenObtainPairView.as_view(), name='token_obtain_pair'),
         path('token/refresh/', TokenRefreshView.as_view(), name='token_refresh'),
         
-        # Скидання пароля (потрібно встановити django-rest-passwordreset)
+        # Скидання пароля
         path('password_reset/', include('django_rest_passwordreset.urls', namespace='password_reset')),
         
-        # Google Auth (заготовка, потребує налаштування GoogleLogin у views.py)
-        # path('auth/google/', GoogleLogin.as_view(), name='google_login'),
+        # Google Auth
         path('auth/google/', GoogleLoginView.as_view(), name='google_login'),
-        path('api/auth/google/', GoogleLoginView.as_view(), name='google_login'),
-    ])),
+        path('admin/metrics/', AdminDashboardView.as_view(), name='admin-metrics'),
+        path('chat/unread-count/', unread_count_stub, name='unread-count'),
+        path('notifications/', notifications_stub, name='notifications'),
+        path('metrics/', AdminDashboardView.as_view(), name='admin-metrics'),
+        path('products/latest/', LatestProductsView.as_view(), name='latest-products'),
+        path('messages/recent/', RecentMessagesView.as_view(), name='recent-messages'),
+
+        ])),
     
-    # Авторизація для інтерфейсу DRF
     path('api-auth/', include('rest_framework.urls')),
 ]
 
-# 3. Раздача медіа-файлів
+# Роздача медіа та статики (для фото товарів)
 if settings.DEBUG:
     urlpatterns += static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)
     urlpatterns += static(settings.STATIC_URL, document_root=settings.STATIC_ROOT)

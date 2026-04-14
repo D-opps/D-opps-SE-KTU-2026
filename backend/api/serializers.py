@@ -1,44 +1,70 @@
 from rest_framework import serializers
-from .models import User, Machine, Product, ProductPhoto
+from .models import User, Machine, Product, ProductPhoto, Message, Conversation, ExchangeOffer, Favorite
+from django.contrib.auth import get_user_model
+
+User = get_user_model()
 
 class UserSerializer(serializers.ModelSerializer):
     class Meta:
         model = User
-        fields = ['id', 'username', 'email', 'role', 'dormitory', 'room_number', 'photo']
+        fields = ['id', 'username', 'email', 'first_name', 'role', 'dormitory', 'room_number', 'photo']
 
 class MachineSerializer(serializers.ModelSerializer):
     class Meta:
         model = Machine
         fields = '__all__'
 
-# 1. ДОБАВЛЯЕМ ЭТОТ КЛАСС (Обязательно!)
 class ProductPhotoSerializer(serializers.ModelSerializer):
     class Meta:
         model = ProductPhoto
         fields = ['id', 'image']
 
 class ProductSerializer(serializers.ModelSerializer):
-    # Исправляем отображение продавца (чтобы в React было поле 'seller')
-    seller = serializers.ReadOnlyField(source='seller.username')
-    
-    # Исправляем отображение фото (теперь это массив объектов с URL, а не UUID)
-    photos = ProductPhotoSerializer(many=True, read_only=True)
+    is_favorite = serializers.SerializerMethodField()
+    seller_name = serializers.ReadOnlyField(source='seller.first_name')
+    seller_id = serializers.ReadOnlyField(source='seller.id')
 
     class Meta:
         model = Product
-        # Явно перечисляем поля, чтобы точно знать, что уходит на фронтенд
-        fields = ['id', 'title', 'price', 'description', 'category', 'seller', 'photos']
+        fields = ['id', 'title', 'description', 'price', 'image', 'category', 'seller_name', 'seller_id', 'status', 'is_favorite']
 
-    # Метод для корректного сохранения фото при создании товара через POST
     def create(self, validated_data):
-        # Получаем файлы из запроса (React присылает их под ключом 'photos')
         request = self.context.get('view').request
-        images_data = request.FILES.getlist('photos')
-        
         product = Product.objects.create(**validated_data)
-        
-        # Создаем записи в таблице фотографий
+        images_data = request.FILES.getlist('photos')
         for image_data in images_data:
             ProductPhoto.objects.create(product=product, image=image_data)
-            
         return product
+    def get_is_favorite(self, obj):
+        user = self.context.get('request').user
+        if user.is_authenticated:
+            return Favorite.objects.filter(user=user, product=obj).exists()
+        return False
+
+# --- ОСНОВНІ ЗМІНИ ТУТ ---
+
+class MessageSerializer(serializers.ModelSerializer):
+    sender_name = serializers.ReadOnlyField(source='sender.first_name')
+    # Додаємо read_only=True для sender
+    sender = serializers.PrimaryKeyRelatedField(read_only=True) 
+    timestamp = serializers.DateTimeField(source='created_at', format="%H:%M", read_only=True)
+
+    class Meta:
+        model = Message
+        fields = ['id', 'conversation', 'sender', 'sender_name', 'text', 'is_read', 'timestamp']
+class ConversationSerializer(serializers.ModelSerializer):
+    messages = MessageSerializer(many=True, read_only=True)
+    # Важливо: витягуємо назву товару прямо в список чатів
+    product_title = serializers.ReadOnlyField(source='product.title')
+    
+    class Meta:
+        model = Conversation
+        fields = ['id', 'type', 'participants', 'product', 'product_title', 'dormitory_number', 'messages', 'created_at']
+
+class ExchangeOfferSerializer(serializers.ModelSerializer):
+    sender_name = serializers.ReadOnlyField(source='sender.first_name')
+    target_product_title = serializers.ReadOnlyField(source='target_product.title')
+
+    class Meta:
+        model = ExchangeOffer
+        fields = '__all__'

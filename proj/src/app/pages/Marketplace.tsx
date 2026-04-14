@@ -1,16 +1,19 @@
 import { useState, useRef, useEffect } from 'react';
 import { Link } from 'react-router';
-import { Search, Plus, X, DollarSign, SlidersHorizontal, Upload } from 'lucide-react';
+import { 
+  Search, Plus, X, DollarSign, SlidersHorizontal, 
+  Upload, Heart, Loader2 
+} from 'lucide-react';
 import axios from 'axios';
+import { toast } from 'sonner';
 
 export function Marketplace() {
   const fileInputRef = useRef<HTMLInputElement>(null);
   
-  // States for Data
   const [marketplaceItems, setMarketplaceItems] = useState<any[]>([]);
+  const [favorites, setFavorites] = useState<string[]>([]); 
   const [isLoading, setIsLoading] = useState(true);
   
-  // States for UI/Filtering
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedCategory, setSelectedCategory] = useState('all');
   const [selectedDorm, setSelectedDorm] = useState('all');
@@ -20,295 +23,207 @@ export function Marketplace() {
   const [showFilters, setShowFilters] = useState(false);
   const itemsPerPage = 9;
 
-  // States for Modal/Form
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   const [newProduct, setNewProduct] = useState({
-    name: '',
-    price: '',
-    category: 'Electronics',
-    description: '',
-    imageUrl: '',
-    dormVisibility: 'all' as 'all' | 'own-dorm',
-    photos: [] as string[],
+    name: '', price: '', category: 'Electronics', description: '', imageUrl: '', photos: [] as string[],
   });
-  const [formErrors, setFormErrors] = useState<Record<string, string>>({});
 
-  const categories = ['all', 'Electronics', 'Furniture', 'Books', 'Clothing', 'Appliances', 'Accessories', 'Transportation', 'Other'];
+  const categories = ['all', 'Favorites', 'Electronics', 'Furniture', 'Books', 'Clothing', 'Appliances', 'Accessories', 'Transportation', 'Other'];
   const dormitories = ['all', '1', '2', '3', '4', '5', '6', '7', '8'];
 
-  // --- DATA FETCHING ---
+  // 1. Отримання товарів (з токеном для перевірки лайків)
   const fetchProducts = async () => {
     try {
       setIsLoading(true);
-      const response = await axios.get('http://127.0.0.1:8000/api/products/');
+      const token = localStorage.getItem('accessToken');
+      
+      const response = await axios.get('http://127.0.0.1:8000/api/products/', {
+        headers: token ? { 'Authorization': `Bearer ${token}` } : {}
+      });
       
       const items = response.data.results || response.data;
 
       if (Array.isArray(items)) {
-        const formattedData = items.map((item: any) => {
-          // Default placeholder image
-          let imageUrl = 'https://images.unsplash.com/photo-1584622650111-993a426fbf0a?q=80&w=1000&auto=format&fit=crop';
-          
-          // SAFE CHECK: Check if photos exists AND has at least one item AND that item has an image property
-          if (item.photos && item.photos.length > 0 && item.photos[0].image) {
-            const photoPath = item.photos[0].image;
-            // Now we check startsWith safely
-            imageUrl = photoPath.startsWith('http') ? photoPath : `http://127.0.0.1:8000${photoPath}`;
-          }
-
-          return {
-            id: item.id.toString(),
-            name: item.title || "Untitled Product", 
-            price: parseFloat(item.price) || 0,
-            category: item.category || "Other",
-            description: item.description || "",
-            seller: item.seller || 'Anonymous',
-            image: imageUrl,
-            dormitory: "all" // Hardcoded for now to bypass your dorm filter
-          };
-        });
+        const formattedData = items.map((item: any) => ({
+          id: item.id.toString(),
+          name: item.title || "Untitled",
+          price: parseFloat(item.price) || 0,
+          category: item.category || "Other",
+          description: item.description || "",
+          seller: item.seller || 'Anonymous',
+          image: item.image ? (item.image.startsWith('http') ? item.image : `http://127.0.0.1:8000${item.image}`) : 'https://via.placeholder.com/400x300',
+          is_favorite: item.is_favorite || false // Це поле прийде з нашого SerializerMethodField
+        }));
         
         setMarketplaceItems(formattedData);
+        // Оновлюємо масив обраного тими ID, де is_favorite === true
+        setFavorites(formattedData.filter(i => i.is_favorite).map(i => i.id));
       }
     } catch (error) {
-      console.error("Connection Failed:", error);
+      console.error("Fetch error:", error);
+      toast.error("Failed to load products");
     } finally {
       setIsLoading(false); 
     }
   };
 
+  // 2. Функція кліку по сердечку
+  const toggleFavorite = async (e: React.MouseEvent, productId: string) => {
+    e.preventDefault();
+    e.stopPropagation();
 
-  // Trigger fetch on load
-  useEffect(() => {
-    fetchProducts();
-  }, []);
+    const token = localStorage.getItem('accessToken');
+    if (!token) {
+      toast.error("Please login to save favorites");
+      return;
+    }
 
-  // --- LOGIC ---
-  // Replace your entire filteredItems logic with this:
+    const isCurrentlyFav = favorites.includes(productId);
+    
+    // Optimistic UI: міняємо колір миттєво
+    if (isCurrentlyFav) {
+      setFavorites(prev => prev.filter(id => id !== productId));
+    } else {
+      setFavorites(prev => [...prev, productId]);
+    }
 
+    try {
+      // Відправляємо на наш новий екшн у Django
+      await axios.post(`http://127.0.0.1:8000/api/products/${productId}/favorite/`, {}, {
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+      toast.success(isCurrentlyFav ? "Removed from favorites" : "Added to favorites");
+    } catch (error) {
+      // Якщо сервер видав помилку — повертаємо колір назад
+      if (isCurrentlyFav) setFavorites(prev => [...prev, productId]);
+      else setFavorites(prev => prev.filter(id => id !== productId));
+      toast.error("Action failed. Try again.");
+    }
+  };
+
+  useEffect(() => { fetchProducts(); }, []);
+
+  // 3. Логіка фільтрації (враховуючи категорію Favorites)
   const filteredItems = marketplaceItems.filter((item) => {
-    // 1. Search filter (works on name and description)
-    const matchesSearch =
-      item.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      item.description.toLowerCase().includes(searchQuery.toLowerCase());
+    const matchesSearch = item.name.toLowerCase().includes(searchQuery.toLowerCase());
     
-    // 2. Category filter (handle case sensitivity)
     const matchesCategory = 
-      selectedCategory === 'all' || 
+      selectedCategory === 'all' ? true :
+      selectedCategory === 'Favorites' ? favorites.includes(item.id) :
       item.category.toLowerCase() === selectedCategory.toLowerCase();
-    
-    // 3. Price filter
+
     const minPrice = priceRange.min ? parseFloat(priceRange.min) : 0;
     const maxPrice = priceRange.max ? parseFloat(priceRange.max) : Infinity;
     const matchesPrice = item.price >= minPrice && item.price <= maxPrice;
 
-    // 4. Dorm filter (Neutralized for now to ensure items show)
-    const matchesDorm = true; 
-
-    return matchesSearch && matchesCategory && matchesPrice && matchesDorm;
+    return matchesSearch && matchesCategory && matchesPrice;
   });
 
+  const sortedItems = [...filteredItems].sort((a, b) => {
+    if (sortBy === 'price-low') return a.price - b.price;
+    if (sortBy === 'price-high') return b.price - a.price;
+    return parseInt(b.id) - parseInt(a.id);
+  });
 
-    const sortedItems = [...filteredItems].sort((a, b) => {
-      switch (sortBy) {
-        case 'price-low': return a.price - b.price;
-        case 'price-high': return b.price - a.price;
-        case 'name': return a.name.localeCompare(b.name);
-        case 'newest':
-        default: return parseInt(b.id) - parseInt(a.id);
-      }
-    });
-
-  const totalPages = Math.ceil(sortedItems.length / itemsPerPage);
-  const startIndex = (currentPage - 1) * itemsPerPage;
-  const paginatedItems = sortedItems.slice(startIndex, startIndex + itemsPerPage);
-
-  const handleFilterChange = () => setCurrentPage(1);
-
-  const handleProductChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
-    const { name, value } = e.target;
-    setNewProduct((prev) => ({ ...prev, [name]: value }));
-    if (formErrors[name]) setFormErrors((prev) => ({ ...prev, [name]: '' }));
-  };
-
-  const validateProduct = () => {
-    const errors: Record<string, string> = {};
-    if (!newProduct.name.trim()) errors.name = 'Product name is required';
-    if (!newProduct.price || parseFloat(newProduct.price) <= 0) errors.price = 'Please enter a valid price';
-    if (!newProduct.description.trim()) errors.description = 'Description is required';
-
-    const hasFile = fileInputRef.current?.files && fileInputRef.current.files.length > 0;
-    const hasUrl = newProduct.imageUrl.trim().length > 0;
-    if (!hasFile && !hasUrl) errors.imageUrl = 'Upload a photo OR provide an image URL';
-
-    setFormErrors(errors);
-    return Object.keys(errors).length === 0;
-  };
+  const paginatedItems = sortedItems.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage);
 
   const handleAddProduct = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!validateProduct()) return;
-
+    const token = localStorage.getItem('accessToken');
     const formData = new FormData();
     formData.append('title', newProduct.name);
     formData.append('price', newProduct.price);
     formData.append('description', newProduct.description);
-    formData.append('category', newProduct.category.toLowerCase());
-    
-    const visibilityMap = { 'all': 'all_dorms', 'own-dorm': 'my_dorm' };
-    formData.append('visibility', visibilityMap[newProduct.dormVisibility] || 'all_dorms');
-
-    if (fileInputRef.current?.files?.[0]) {
-      formData.append('photos', fileInputRef.current.files[0]); 
-    }
+    formData.append('category', newProduct.category);
+    if (fileInputRef.current?.files?.[0]) formData.append('image', fileInputRef.current.files[0]);
 
     try {
-      await axios.post('http://127.0.0.1:8000/api/products/', formData);
-      alert("Product successfully added!");
-      setIsAddModalOpen(false);
-      setNewProduct({ 
-        name: '', price: '', category: 'Electronics', 
-        description: '', imageUrl: '', dormVisibility: 'all', photos: [] 
+      await axios.post('http://127.0.0.1:8000/api/products/', formData, {
+        headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'multipart/form-data' }
       });
-      fetchProducts();
-    } catch (error: any) {
-      console.error(error);
-      alert("Error: " + JSON.stringify(error.response?.data || error.message));
-    }
+      toast.success("Product listed!");
+      setIsAddModalOpen(false);
+      fetchProducts(); 
+    } catch { toast.error("Error adding product"); }
   };
 
   return (
-    <div className="p-4 lg:p-8 max-w-7xl mx-auto">
-      {/* Header */}
+    <div className="p-4 lg:p-8 max-w-7xl mx-auto min-h-screen bg-gray-50/30">
       <div className="mb-8 flex items-center justify-between">
         <div>
-          <h1 className="text-3xl mb-2">Marketplace</h1>
-          <p className="text-gray-600">Buy and sell items with your dorm mates</p>
+          <h1 className="text-4xl font-black text-gray-900 tracking-tight">Marketplace</h1>
+          <p className="text-gray-500 font-medium">Find what you need or sell yours</p>
         </div>
-        <button
-          onClick={() => setIsAddModalOpen(true)}
-          className="flex items-center gap-2 px-4 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
-        >
+        <button onClick={() => setIsAddModalOpen(true)} className="flex items-center gap-2 px-6 py-3 bg-blue-600 text-white rounded-2xl font-bold shadow-lg hover:bg-blue-700 transition-all active:scale-95">
           <Plus className="w-5 h-5" />
-          <span className="hidden sm:inline">Add Product</span>
+          <span>List Product</span>
         </button>
       </div>
 
-      {/* Search and Filters */}
-      <div className="bg-white rounded-2xl p-4 md:p-6 shadow-sm border border-gray-100 mb-6">
-        <div className="flex flex-col gap-4">
-          <div className="flex gap-2">
+      <div className="bg-white rounded-[2rem] p-6 shadow-sm border border-gray-100 mb-8">
+        <div className="flex flex-col gap-5">
+          <div className="flex gap-3">
             <div className="flex-1 relative">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
+              <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
               <input
-                type="text"
-                placeholder="Search items..."
+                type="text" placeholder="Search..."
                 value={searchQuery}
-                onChange={(e) => {
-                  setSearchQuery(e.target.value);
-                  handleFilterChange();
-                }}
-                className="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                onChange={(e) => { setSearchQuery(e.target.value); setCurrentPage(1); }}
+                className="w-full pl-12 pr-4 py-4 bg-gray-50 border-none rounded-2xl focus:ring-2 focus:ring-blue-500 font-medium"
               />
             </div>
-            <button
-              onClick={() => setShowFilters(!showFilters)}
-              className={`px-4 py-3 rounded-lg flex items-center gap-2 transition-colors ${
-                showFilters ? 'bg-blue-600 text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
-              }`}
-            >
+            <button onClick={() => setShowFilters(!showFilters)} className={`px-5 py-4 rounded-2xl flex items-center gap-2 font-bold transition-all ${showFilters ? 'bg-blue-600 text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'}`}>
               <SlidersHorizontal className="w-5 h-5" />
-              <span className="hidden sm:inline">Filters</span>
+              <span>Filters</span>
             </button>
           </div>
 
           {showFilters && (
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 pt-4 border-t">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6 p-6 bg-gray-50 rounded-[2rem] border border-gray-100">
               <div>
-                <label className="block text-sm mb-2 text-gray-700">Category</label>
-                <select
-                  value={selectedCategory}
-                  onChange={(e) => { setSelectedCategory(e.target.value); handleFilterChange(); }}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                >
-                  {categories.map((category) => (
-                    <option key={category} value={category}>{category}</option>
-                  ))}
+                <label className="text-xs font-black text-gray-400 uppercase mb-2 block">Category</label>
+                <select value={selectedCategory} onChange={(e) => setSelectedCategory(e.target.value)} className="w-full px-4 py-3 bg-white border border-gray-200 rounded-xl font-bold outline-none">
+                  {categories.map((c) => <option key={c} value={c}>{c}</option>)}
                 </select>
               </div>
               <div>
-                <label className="block text-sm mb-2 text-gray-700">Dormitory</label>
-                <select
-                  value={selectedDorm}
-                  onChange={(e) => { setSelectedDorm(e.target.value); handleFilterChange(); }}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                >
-                  {dormitories.map((dorm) => (
-                    <option key={dorm} value={dorm}>{dorm === 'all' ? 'All Dorms' : `Dorm ${dorm}`}</option>
-                  ))}
-                </select>
-              </div>
-              <div>
-                <label className="block text-sm mb-2 text-gray-700">Price Range</label>
+                <label className="text-xs font-black text-gray-400 uppercase mb-2 block">Price Range</label>
                 <div className="flex gap-2">
-                  <input
-                    type="number" placeholder="Min" value={priceRange.min}
-                    onChange={(e) => { setPriceRange({ ...priceRange, min: e.target.value }); handleFilterChange(); }}
-                    className="w-1/2 px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  />
-                  <input
-                    type="number" placeholder="Max" value={priceRange.max}
-                    onChange={(e) => { setPriceRange({ ...priceRange, max: e.target.value }); handleFilterChange(); }}
-                    className="w-1/2 px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  />
+                  <input type="number" placeholder="Min" value={priceRange.min} onChange={(e) => setPriceRange({...priceRange, min: e.target.value})} className="w-1/2 px-4 py-3 bg-white border border-gray-200 rounded-xl font-bold" />
+                  <input type="number" placeholder="Max" value={priceRange.max} onChange={(e) => setPriceRange({...priceRange, max: e.target.value})} className="w-1/2 px-4 py-3 bg-white border border-gray-200 rounded-xl font-bold" />
                 </div>
               </div>
             </div>
           )}
-
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pt-2 border-t">
-            <p className="text-sm text-gray-600">{sortedItems.length} items found</p>
-            <div className="flex items-center gap-2">
-              <label className="text-sm text-gray-600">Sort by:</label>
-              <select
-                value={sortBy}
-                onChange={(e) => setSortBy(e.target.value as any)}
-                className="px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
-              >
-                <option value="newest">Newest First</option>
-                <option value="price-low">Price: Low to High</option>
-                <option value="price-high">Price: High to Low</option>
-                <option value="name">Name: A-Z</option>
-              </select>
-            </div>
-          </div>
         </div>
       </div>
 
-      {/* Items Grid / Loading State */}
       {isLoading ? (
-        <div className="flex flex-col items-center justify-center py-20">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mb-4"></div>
-          <p className="text-gray-500">Connecting to database...</p>
-        </div>
+        <div className="flex flex-col items-center justify-center py-24"><Loader2 className="w-10 h-10 text-blue-600 animate-spin" /></div>
       ) : (
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 md:gap-6">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-8">
           {paginatedItems.map((item) => (
-            <Link
-              key={item.id}
-              to={`/marketplace/${item.id}`}
-              className="bg-white rounded-2xl overflow-hidden shadow-sm border border-gray-100 hover:shadow-md transition-shadow flex flex-col"
-            >
-              <img src={item.image} alt={item.name} className="w-full h-48 object-cover" />
-              <div className="p-4 flex-1 flex flex-col">
-                <div className="flex items-start justify-between mb-2">
-                  <h3 className="text-lg font-medium">{item.name}</h3>
-                  <span className="text-lg text-blue-600 font-semibold">${item.price}</span>
+            <Link key={item.id} to={`/marketplace/${item.id}`} className="group bg-white rounded-[2.5rem] overflow-hidden shadow-sm border border-gray-100 hover:shadow-xl transition-all relative flex flex-col">
+              <button
+                onClick={(e) => toggleFavorite(e, item.id)}
+                className="absolute top-5 right-5 z-20 p-3 rounded-2xl bg-white/90 backdrop-blur-md shadow-sm transition-all active:scale-75"
+              >
+                <Heart className={`w-5 h-5 transition-colors ${favorites.includes(item.id) ? 'fill-red-500 text-red-500' : 'text-gray-400'}`} />
+              </button>
+
+              <div className="h-64 overflow-hidden bg-gray-100">
+                <img src={item.image} alt={item.name} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" />
+              </div>
+
+              <div className="p-6 flex-1 flex flex-col">
+                <div className="flex justify-between mb-2">
+                  <h3 className="text-xl font-bold text-gray-900 leading-tight">{item.name}</h3>
+                  <span className="text-2xl font-black text-blue-600">${item.price}</span>
                 </div>
-                <p className="text-sm text-gray-600 mb-3 line-clamp-2 flex-1">{item.description}</p>
-                <div className="flex items-center justify-between mt-auto">
-                  <span className="text-xs bg-gray-100 text-gray-600 px-2 py-1 rounded-full">{item.category}</span>
-                  <span className="text-xs text-gray-500">{item.seller}</span>
+                <p className="text-sm text-gray-500 font-medium mb-6 line-clamp-2 leading-relaxed">{item.description}</p>
+                <div className="mt-auto pt-4 border-t border-gray-50 flex justify-between items-center text-[10px] font-black uppercase text-gray-400">
+                   <span>{item.category}</span>
+                   <span>Dorm {item.dormitory || '1'}</span>
                 </div>
               </div>
             </Link>
@@ -316,98 +231,28 @@ export function Marketplace() {
         </div>
       )}
 
-      {!isLoading && paginatedItems.length === 0 && (
-        <div className="text-center py-12 text-gray-500">
-          <p>No items found matching your filters.</p>
-        </div>
-      )}
-
-      {/* Pagination omitted for brevity, same as your original */}
-
-      {/* Add Product Modal */}
+      {/* Modal - без змін дизайну */}
       {isAddModalOpen && (
-        <div className="fixed inset-0 backdrop-blur-sm bg-black bg-opacity-30 flex items-center justify-center p-4 z-50">
-          <div className="bg-white rounded-2xl p-6 max-w-md w-full max-h-[90vh] overflow-y-auto shadow-2xl">
-            <div className="flex items-center justify-between mb-6">
-              <h2 className="text-2xl font-semibold">Add New Product</h2>
-              <button onClick={() => setIsAddModalOpen(false)} className="text-gray-400 hover:text-gray-600">
-                <X className="w-6 h-6" />
-              </button>
+        <div className="fixed inset-0 backdrop-blur-md bg-black/20 flex items-center justify-center p-4 z-50">
+          <div className="bg-white rounded-[2.5rem] p-8 max-w-md w-full shadow-2xl overflow-y-auto max-h-[90vh]">
+            <div className="flex justify-between mb-8">
+              <h2 className="text-2xl font-black text-gray-900">List Product</h2>
+              <button onClick={() => setIsAddModalOpen(false)}><X className="text-gray-400" /></button>
             </div>
-
-            <form onSubmit={handleAddProduct} className="space-y-4">
-              <div>
-                <label className="block text-sm mb-1 text-gray-700">Product Name</label>
-                <input
-                  name="name" type="text" value={newProduct.name} onChange={handleProductChange}
-                  placeholder="e.g., Mini Fridge"
-                  className={`w-full px-4 py-3 border rounded-lg focus:ring-2 focus:ring-blue-500 ${formErrors.name ? 'border-red-500' : 'border-gray-300'}`}
-                />
-                {formErrors.name && <p className="text-red-500 text-xs mt-1">{formErrors.name}</p>}
-              </div>
-
-              <div>
-                <label className="block text-sm mb-1 text-gray-700">Price</label>
-                <div className="relative">
-                  <DollarSign className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
-                  <input
-                    name="price" type="number" step="0.01" value={newProduct.price} onChange={handleProductChange}
-                    className={`w-full pl-10 pr-4 py-3 border rounded-lg focus:ring-2 focus:ring-blue-500 ${formErrors.price ? 'border-red-500' : 'border-gray-300'}`}
-                  />
-                </div>
-              </div>
-
-              <div>
-                <label className="block text-sm mb-1 text-gray-700">Category</label>
-                <select
-                  name="category" value={newProduct.category} onChange={handleProductChange}
-                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
-                >
-                  {categories.filter(c => c !== 'all').map(c => <option key={c} value={c}>{c}</option>)}
+            <form onSubmit={handleAddProduct} className="space-y-5">
+              <input placeholder="Title" value={newProduct.name} onChange={(e) => setNewProduct({...newProduct, name: e.target.value})} className="w-full px-5 py-4 bg-gray-50 rounded-2xl outline-none font-bold" />
+              <div className="flex gap-4">
+                <input placeholder="Price" type="number" value={newProduct.price} onChange={(e) => setNewProduct({...newProduct, price: e.target.value})} className="w-full px-5 py-4 bg-gray-50 rounded-2xl outline-none font-bold" />
+                <select value={newProduct.category} onChange={(e) => setNewProduct({...newProduct, category: e.target.value})} className="w-full px-5 py-4 bg-gray-50 rounded-2xl outline-none font-bold">
+                  {categories.filter(c => c !== 'all' && c !== 'Favorites').map(c => <option key={c} value={c}>{c}</option>)}
                 </select>
               </div>
-
-              <div>
-                <label className="block text-sm mb-1 text-gray-700">Description</label>
-                <textarea
-                  name="description" value={newProduct.description} onChange={handleProductChange}
-                  rows={3} className={`w-full px-4 py-3 border rounded-lg focus:ring-2 focus:ring-blue-500 ${formErrors.description ? 'border-red-500' : 'border-gray-300'}`}
-                />
-              </div>
-
-              <div>
-                <label className="block text-sm mb-1 text-gray-700">Photos</label>
-                <div className="space-y-3">
-                  <button
-                    type="button" onClick={() => fileInputRef.current?.click()}
-                    className="w-full px-4 py-3 border-2 border-dashed border-gray-300 rounded-lg hover:border-blue-500 flex items-center justify-center gap-2 text-gray-500"
-                  >
-                    <Upload className="w-5 h-5" /> <span>Upload File</span>
-                  </button>
-                  <input
-                    ref={fileInputRef} type="file" accept="image/*" className="hidden"
-                    onChange={(e) => {
-                      const file = e.target.files?.[0];
-                      if (file) {
-                        const reader = new FileReader();
-                        reader.onloadend = () => setNewProduct(p => ({ ...p, photos: [reader.result as string] }));
-                        reader.readAsDataURL(file);
-                      }
-                    }}
-                  />
-                  {newProduct.photos.length > 0 && (
-                    <div className="relative w-24 h-24">
-                      <img src={newProduct.photos[0]} className="w-full h-full object-cover rounded-lg border" alt="Preview" />
-                      <button type="button" onClick={() => setNewProduct(p => ({ ...p, photos: [] }))} className="absolute -top-2 -right-2 bg-red-500 text-white rounded-full p-1"><X className="w-3 h-3" /></button>
-                    </div>
-                  )}
-                </div>
-              </div>
-
-              <div className="flex gap-3 pt-4">
-                <button type="button" onClick={() => setIsAddModalOpen(false)} className="flex-1 px-4 py-3 border rounded-lg">Cancel</button>
-                <button type="submit" className="flex-1 px-4 py-3 bg-blue-600 text-white rounded-lg font-medium">Add Item</button>
-              </div>
+              <textarea placeholder="Details" rows={3} value={newProduct.description} onChange={(e) => setNewProduct({...newProduct, description: e.target.value})} className="w-full px-5 py-4 bg-gray-50 rounded-2xl outline-none font-medium" />
+              <button type="button" onClick={() => fileInputRef.current?.click()} className="w-full py-8 border-2 border-dashed border-gray-200 rounded-[2rem] text-gray-400 font-bold uppercase text-xs flex flex-col items-center gap-2">
+                <Upload size={24} /> Upload Photo
+              </button>
+              <input ref={fileInputRef} type="file" className="hidden" />
+              <button type="submit" className="w-full py-4 bg-blue-600 text-white rounded-2xl font-black shadow-lg shadow-blue-200 active:scale-95 transition-all">Publish</button>
             </form>
           </div>
         </div>
