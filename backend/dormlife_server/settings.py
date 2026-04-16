@@ -125,7 +125,5 @@ EMAIL_HOST_PASSWORD = 'wlglffhanapxwsqj'
 # Як саме буде підписаний відправник у листі
 DEFAULT_FROM_EMAIL = 'DormLife Team <polina.sevastianova9@gmail.com>'
 
-LANGUAGE_CODE = 'en-us' 
-
-USE_I18N = True
-USE_TZ = True
+MEDIA_URL = '/media/'
+MEDIA_ROOT = os.path.join(BASE_DIR, 'media')

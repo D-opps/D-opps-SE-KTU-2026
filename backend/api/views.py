@@ -1,12 +1,10 @@
 from rest_framework import viewsets, permissions, status, views
 from rest_framework.response import Response
-
-# Отримуємо твою кастомну модель User
 from rest_framework.permissions import AllowAny, IsAuthenticated
 from django.contrib.auth import get_user_model
 from rest_framework_simplejwt.tokens import RefreshToken
 from django.db.models import Q
-from .models import Favorite, Machine, Product, Conversation, Message, ExchangeOffer
+from .models import Machine, Product, Conversation, Message, ExchangeOffer
 from .serializers import (
     UserSerializer, MachineSerializer, ProductSerializer, 
     ConversationSerializer, MessageSerializer, ExchangeOfferSerializer
@@ -18,7 +16,6 @@ from django.utils import timezone
 from datetime import timedelta
 from django.db.models import Count
 from rest_framework import generics
-from rest_framework.parsers import MultiPartParser, FormParser
 
 User = get_user_model()
 
@@ -34,24 +31,35 @@ class ProductViewSet(viewsets.ModelViewSet):
 
     def perform_create(self, serializer):
         serializer.save(seller=self.request.user)
-    @action(detail=True, methods=['post'])
+
+    # Метод 1
+    @action(detail=True, methods=['post'], permission_classes=[permissions.IsAuthenticated])
+    def mark_as_sold(self, request, pk=None):
+        product = self.get_object()
+        if product.seller != request.user:
+            return Response({'error': 'Not authorized'}, status=status.HTTP_403_FORBIDDEN)
+        
+        product.status = 'sold'
+        product.save()
+        return Response({'status': 'item marked as sold'})
+
+    # Метод 2 (ТЕПЕР ВІН НА ОДНОМУ РІВНІ З ІНШИМИ)
+    @action(detail=True, methods=['post'], url_path='favorite', permission_classes=[permissions.IsAuthenticated])
     def favorite(self, request, pk=None):
         product = self.get_object()
         user = request.user
         
-        # Шукаємо існуючий запис у таблиці Favorite
-        # Ми звертаємося до моделі Favorite безпосередньо
-        favorite_exists = Favorite.objects.filter(user=user, product=product).first()
-
-        if favorite_exists:
-            # Якщо запис є — видаляємо його (прибираємо з обраного)
-            favorite_exists.delete()
-            return Response({'is_favorite': False}, status=status.HTTP_200_OK)
-        else:
-            # Якщо запису немає — створюємо (додаємо в обране)
-            # Тут ми явно створюємо об'єкт Favorite, як того хоче Django
-            Favorite.objects.create(user=user, product=product)
-            return Response({'is_favorite': True}, status=status.HTTP_201_CREATED)
+        # Переконайся, що модель Favorite імпортована вгорі файлу!
+        from .models import Favorite 
+        
+        favorite_query = Favorite.objects.filter(user=user, product=product)
+        
+        if favorite_query.exists():
+            favorite_query.delete()
+            return Response({'status': 'unfavorited', 'is_favorite': False}, status=status.HTTP_200_OK)
+        
+        Favorite.objects.create(user=user, product=product)
+        return Response({'status': 'favorited', 'is_favorite': True}, status=status.HTTP_201_CREATED)
 class RegisterView(views.APIView):
     permission_classes = [AllowAny]
 
@@ -72,244 +80,206 @@ class RegisterView(views.APIView):
             dorm = data.get('dormitory')
             if dorm and str(dorm).isdigit():
                 user.dormitory = int(dorm)
-
             user.save()
-            return Response({"message": "User registered successfully"}, status=status.HTTP_201_CREATED)
+
+            # АВТО-СТВОРЕННЯ/ПРИЄДНАННЯ ДО ГРУПИ ГУРТОЖИТКУ
+            if user.dormitory:
+                # Шукаємо або створюємо чат типу 'group' для цього гуртожитку
+                group_chat, created = Conversation.objects.get_or_create(
+                    type='group',
+                    dormitory_number=user.dormitory
+                )
+                # Додаємо юзера в учасники (якщо логіка передбачає ManyToMany для груп)
+                group_chat.participants.add(user)
+
+            return Response({"message": "Success"}, status=status.HTTP_201_CREATED)
         except Exception as e:
             # Повертаємо зрозумілу помилку
             return Response({"error": str(e)}, status=status.HTTP_400_BAD_REQUEST)
+
+class UserProfileView(views.APIView):
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        user = request.user
+        my_products = Product.objects.filter(seller=user)
+        return Response({
+            "profile": UserSerializer(user).data,
+            "products": ProductSerializer(my_products, many=True).data
+        })
+
+    def patch(self, request):
+        user = request.user
+        serializer = UserSerializer(user, data=request.data, partial=True)
+        if serializer.is_valid():
+            serializer.save()
+            return Response({"message": "Profile updated", "profile": serializer.data})
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+class ConversationViewSet(viewsets.ModelViewSet):
+    serializer_class = ConversationSerializer
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get_queryset(self):
+        user = self.request.user
+        
+        # 1. Авто-створення ГРУПОВОГО чату гуртожитку
+        if user.dormitory:
+            Conversation.objects.get_or_create(
+                type='group', 
+                dormitory_number=user.dormitory
+            )
+            
+            # 2. Авто-створення чату з АДМІНОМ ЦЬОГО ГУРТОЖИТКУ
+            # Шукаємо адміна, у якого номер гуртожитку збігається з юзером
+            local_admin = User.objects.filter(role='admin', dormitory=user.dormitory).first()
+            
+            if local_admin and user.role != 'admin':
+                # Перевіряємо, чи вже є приватний чат типу 'admin' між ними
+                admin_chat = Conversation.objects.filter(
+                    type='admin', 
+                    participants=user
+                ).filter(participants=local_admin).first()
+                
+                if not admin_chat:
+                    new_chat = Conversation.objects.create(type='admin', dormitory_number=user.dormitory)
+                    new_chat.participants.add(user, local_admin)
+
+        # Повертаємо всі чати користувача
+        return Conversation.objects.filter(
+            Q(participants=user) | 
+            Q(type='group', dormitory_number=user.dormitory)
+        ).distinct().order_by('-created_at')
+    def create(self, request, *args, **kwargs):
+        receiver_id = request.data.get('receiver_id')
+        if not receiver_id:
+            return Response({"error": "receiver_id is required"}, status=400)
+
+        # Переконуємося, що ми не створюємо чат самі з собою
+        if str(receiver_id) == str(request.user.id):
+            return Response({"error": "You cannot start a chat with yourself"}, status=400)
+
+        try:
+            receiver = User.objects.get(id=receiver_id)
+        except User.DoesNotExist:
+            return Response({"error": "User not found"}, status=404)
+
+        # Шукаємо існуючий ПРИВАТНИЙ чат між цими двома юзерами
+        conversation = Conversation.objects.filter(type='private')\
+            .filter(participants=request.user)\
+            .filter(participants=receiver).first()
+
+        if not conversation:
+            # Якщо чату немає — створюємо новий
+            conversation = Conversation.objects.create(type='private')
+            conversation.participants.add(request.user, receiver)
+
+        return Response(ConversationSerializer(conversation).data, status=status.HTTP_201_CREATED)
+class MessageViewSet(viewsets.ModelViewSet):
+    queryset = Message.objects.all()
+    serializer_class = MessageSerializer
+    permission_classes = [permissions.IsAuthenticated]
+
+    def perform_create(self, serializer):
+        # Отримуємо розмову
+        conversation_id = self.request.data.get('conversation')
+        try:
+            conversation = Conversation.objects.get(id=conversation_id)
+            
+            # Перевірка прав (як ми писали раніше)
+            if conversation.type != 'group':
+                if not conversation.participants.filter(id=self.request.user.id).exists():
+                    # Якщо юзер не учасник, Django видасть помилку 403
+                    from rest_framework.exceptions import PermissionDenied
+                    raise PermissionDenied("You are not a participant of this chat.")
+
+            # Зберігаємо повідомлення, ПРИМУСОВО вказуючи sender
+            serializer.save(sender=self.request.user, conversation=conversation)
+            
+        except Conversation.DoesNotExist:
+            from rest_framework.exceptions import ValidationError
+            raise ValidationError({"conversation": "Conversation not found."})
 
 class GoogleLoginView(views.APIView):
     permission_classes = [AllowAny]
 
     def post(self, request):
         token = request.data.get('token')
-        
-        # Використовуємо userinfo замість tokeninfo для access_token
         google_url = f"https://www.googleapis.com/oauth2/v3/userinfo?access_token={token}"
         response = requests.get(google_url)
-        
         if response.status_code != 200:
-            return Response({"error": "Invalid Google token", "details": response.text}, 
-                            status=status.HTTP_400_BAD_REQUEST)
+            return Response({"error": "Invalid Google token"}, status=status.HTTP_400_BAD_REQUEST)
         
         user_data = response.json()
         email = user_data.get('email')
-        first_name = user_data.get('given_name', user_data.get('name', ''))
-
-        # Шукаємо або створюємо користувача
         user, created = User.objects.get_or_create(
             email=email,
-            defaults={
-                'username': email,
-                'first_name': first_name,
-                'role': 'student'
-            }
+            defaults={'username': email, 'first_name': user_data.get('name', ''), 'role': 'student'}
         )
-
         refresh = RefreshToken.for_user(user)
-        
         return Response({
             'access': str(refresh.access_token),
             'refresh': str(refresh),
-            'user': {
-                'email': user.email,
-                'full_name': user.first_name,
-                'role': user.role
-            }
+            'user': {'email': user.email, 'full_name': user.first_name, 'role': user.role}
         })
-class ConversationViewSet(viewsets.ModelViewSet):
-    serializer_class = ConversationSerializer
-    permission_classes = [permissions.IsAuthenticated]
-
-    def get_queryset(self):
-        return Conversation.objects.filter(participants=self.request.user).distinct()
-
-    def create(self, request, *args, **kwargs):
-        product_id = request.data.get('product_id')
-        # Ми можемо отримати receiver_id або витягнути його прямо з продукту
-        receiver_id = request.data.get('receiver_id')
-        
-        if not product_id:
-            return Response({"error": "product_id is required"}, status=400)
-
-        try:
-            product = Product.objects.get(id=product_id)
-            seller = product.seller
-            
-            if seller == request.user:
-                return Response({"error": "You cannot start a conversation with yourself"}, status=400)
-
-            # Шукаємо існуючий чат між цими двома людьми щодо цього продукту
-            conversation = Conversation.objects.filter(
-                participants=request.user
-            ).filter(
-                participants=seller
-            ).filter(product=product).first()
-
-            if not conversation:
-                # Якщо чату немає — створюємо
-                conversation = Conversation.objects.create(product=product)
-                conversation.participants.add(request.user, seller)
-
-            serializer = self.get_serializer(conversation)
-            return Response(serializer.data, status=201)
-
-        except Product.DoesNotExist:
-            return Response({"error": "Product not found"}, status=404)
-        except Exception as e:
-            return Response({"error": str(e)}, status=400)
-    @action(detail=False, methods=['get'])
-    def dormitory_chat(self, request):
-        user = request.user
-        if not user.dormitory:
-            return Response({"error": "User has no dormitory assigned"}, status=400)
-
-        # Шукаємо чат саме для цього номера гуртожитку
-        conversation, created = Conversation.objects.get_or_create(
-            type='group',
-            dormitory_number=user.dormitory,
-            defaults={'product': None}
-        )
-    @action(detail=False, methods=['get'])
-    def metrics(self, request):
-        user = request.user
-        # Отримуємо період з параметрів запиту (дефолт 7 днів)
-        period = int(request.query_params.get('period', 7))
-        date_from = timezone.now() - timedelta(days=period)
-        
-        # Визначаємо гуртожиток користувача
-        user_dorm = getattr(user, 'dormitory', None)
-
-        # Якщо у користувача не вказано гуртожиток, можна або видати помилку, 
-        # або (якщо це СуперАдмін) показати все.
-        if not user_dorm:
-            return Response({"error": "No dormitory assigned to user"}, status=400)
-
-        # Фільтруємо всі дані за гуртожитком
-        # Припускаємо, що у моделей User та Product є поле dormitory
-        # А у Message та Machine можна вийти через зв'язки
-        
-        return Response({
-            "totalUsers": User.objects.filter(dormitory=user_dorm).count(),
-            "verifiedUsers": User.objects.filter(dormitory=user_dorm, is_active=True).count(),
-            
-            "totalMessages": Message.objects.filter(
-                conversation__dormitory_number=user_dorm # якщо в конверсації є номер дорму
-            ).count(),
-            
-            "totalListings": Product.objects.filter(seller__dormitory=user_dorm).count(),
-            "activeListings": Product.objects.filter(
-                seller__dormitory=user_dorm, 
-                status='available'
-            ).count(),
-            
-            "dormitoryNumber": user_dorm # Повертаємо номер для заголовка на фронті
-        })
-
-    # views.py у класі ConversationViewSet або окремим методом
-    @action(detail=False, methods=['get'])
-    def recent_messages(self, request):
-        # Фільтруємо повідомлення: тільки ті, де користувач є учасником чату
-        messages = Message.objects.filter(
-            conversation__participants=request.user
-        ).order_by('-created_at')[:3]
-        
-        data = [{
-            "id": m.id,
-            "sender_name": m.sender.first_name or m.sender.username,
-            "text": m.text,
-            "timestamp": m.created_at.strftime("%H:%M")
-        } for m in messages]
-        return Response(data)
-
-class MessageViewSet(viewsets.ModelViewSet):
-    serializer_class = MessageSerializer
-    permission_classes = [permissions.IsAuthenticated]
-
-    def get_queryset(self):
-        # Повідомлення лише з чатів, де є користувач
-        return Message.objects.filter(
-            conversation__participants=self.request.user
-        )
-
-    def perform_create(self, serializer):
-        serializer.save(sender=self.request.user)
-
-class ProfileView(APIView):
+class AdminDashboardView(APIView):
     permission_classes = [IsAuthenticated]
-    parser_classes = (MultiPartParser, FormParser)
 
     def get(self, request):
-        try:
-            user = request.user
-            
-            # Фільтруємо товари
-            my_products = Product.objects.filter(seller=user)
-            
-            # ВАЖЛИВО: Передаємо context={'request': request}
-            # Це виправить помилку 'NoneType' object has no attribute 'user'
-            products_data = ProductSerializer(
-                my_products, 
-                many=True, 
-                context={'request': request}
-            ).data
+        if request.user.role != 'admin':
+            return Response({"error": "Forbidden"}, status=403)
 
-            photo_url = None
-            if user.photo:
-                try:
-                    photo_url = user.photo.url
-                except:
-                    photo_url = None
-
-            return Response({
-                "profile": {
-                    "first_name": user.first_name or "User",
-                    "email": user.email,
-                    "dormitory": getattr(user, 'dormitory', ''),
-                    "room_number": getattr(user, 'room_number', ''),
-                    "photo": photo_url,
-                    "role": getattr(user, 'role', 'student'),
-                },
-                "products": products_data
+        # Отримуємо період з URL (за замовчуванням 7)
+        period = int(request.query_params.get('period', 7))
+        dorm = request.user.dormitory
+        
+        today = timezone.now().date()
+        
+        # Статистика
+        total_students = User.objects.filter(dormitory=dorm, role='student').count()
+        active_ads = Product.objects.filter(seller__dormitory=dorm, status='available').count()
+        
+        # Дані для графіка залежно від періоду
+        chart_data = []
+        for i in range(period - 1, -1, -1):
+            date = today - timedelta(days=i)
+            count = Message.objects.filter(
+                conversation__dormitory_number=dorm, 
+                created_at__date=date
+            ).count()
+            chart_data.append({
+                "label": date.strftime("%d %b"), # Формат "13 Apr"
+                "value": count
             })
-        except Exception as e:
-            import traceback
-            print(traceback.format_exc()) # Це виведе повний шлях помилки в термінал
-            return Response({"error": str(e)}, status=500)
 
-    def patch(self, request):
-        # Робимо те саме для методу PATCH
-        try:
-            user = request.user
-            data = request.data
+        # Повертаємо структуру, яку очікує фронтенд
+        return Response({
+            "stats": [
+                {"label": "Студентів", "value": total_students},
+                {"label": "Оголошень", "value": active_ads},
+                {"label": "Повідомлень сьогодні", "value": Message.objects.filter(conversation__dormitory_number=dorm, created_at__date=today).count()},
+            ],
+            "chart": chart_data
+        })
+# Останні 3 товари для дашборду
+class LatestProductsView(generics.ListAPIView):
+    serializer_class = ProductSerializer
+    permission_classes = [IsAuthenticated]
 
-            user.first_name = data.get('first_name', user.first_name)
-            user.room_number = data.get('room_number', user.room_number)
-            if 'dormitory' in data:
-                user.dormitory = data.get('dormitory')
-            if 'photo' in request.FILES:
-                user.photo = request.FILES['photo']
-            user.save()
+    def get_queryset(self):
+        # Повертаємо останні 3 товари з гуртожитку користувача
+        return Product.objects.filter(
+            seller__dormitory=self.request.user.dormitory,
+            status='available'
+        ).order_by('-created_at')[:3]
 
-            my_products = Product.objects.filter(seller=user)
-            products_data = ProductSerializer(
-                my_products, 
-                many=True, 
-                context={'request': request}
-            ).data
+# Останні 3 повідомлення для дашборду
+class RecentMessagesView(generics.ListAPIView):
+    serializer_class = MessageSerializer
+    permission_classes = [IsAuthenticated]
 
-            return Response({
-                "profile": {
-                    "first_name": user.first_name,
-                    "email": user.email,
-                    "dormitory": user.dormitory,
-                    "room_number": user.room_number,
-                    "photo": user.photo.url if user.photo else None,
-                    "role": getattr(user, 'role', 'student'),
-                },
-                "products": products_data
-            })
-        except Exception as e:
-            print(f"PATCH ERROR: {e}")
-            return Response({"error": str(e)}, status=500)
+    def get_queryset(self):
+        # Повертаємо останні 3 повідомлення з чатів, де є користувач
+        return Message.objects.filter(
+            conversation__participants=self.request.user
+        ).order_by('-created_at')[:3]

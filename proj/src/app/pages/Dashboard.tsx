@@ -1,7 +1,7 @@
 import { Link } from 'react-router';
 import { 
-  WashingMachine, ShoppingBag, MessageSquare, Users, 
-  MessageCircle, Calendar, MessageSquare as ChatIcon, TrendingUp, Loader2, Zap
+  WashingMachine, ShoppingBag, MessageSquare, ArrowRight, 
+  Users, MessageCircle, Activity, TrendingUp
 } from 'lucide-react';
 import { useState, useEffect } from 'react';
 
@@ -17,179 +17,146 @@ interface Metrics {
   recentEvents: number;
 }
 
-interface Machine {
-  id: number;
-  status: 'free' | 'occupied' | 'out-of-order'; // Змінено під твій Django models.py
-}
-
-interface ChatMessage {
-  id: number;
-  sender_name: string;
-  text: string;
-  timestamp: string;
-}
+// --- Interfaces ---
+interface StatItem { label: string; value: number; }
+interface MetricsResponse { stats: StatItem[]; }
 
 export function Dashboard() {
-  const [userRole, setUserRole] = useState<string>(localStorage.getItem('userRole') || 'student');
-  const [userName, setUserName] = useState<string>(localStorage.getItem('userName') || 'User');
-  
-  const [metrics, setMetrics] = useState<Metrics | null>(null);
-  const [machines, setMachines] = useState<Machine[]>([]);
-  const [messages, setMessages] = useState<ChatMessage[]>([]);
-  
-  const [loading, setLoading] = useState(true);
+  const [userRole, setUserRole] = useState<string>('student');
+  const [userName, setUserName] = useState<string>('User');
+  const [metrics, setMetrics] = useState<MetricsResponse | null>(null);
   const [metricsPeriod, setMetricsPeriod] = useState(7);
+  const [loading, setLoading] = useState(true);
 
   const token = localStorage.getItem('accessToken');
 
-  useEffect(() => {
-    // 1. Спочатку беремо те, що є в пам'яті
-    const role = localStorage.getItem('userRole') || 'student';
-    setUserRole(role);
-
-    // 2. Оновлюємо дані з сервера
-    fetchAllData();
-  }, [metricsPeriod]);
-
-  const fetchAllData = async () => {
-    setLoading(true);
+  const fetchMetrics = async () => {
     try {
-      const headers = { 'Authorization': `Bearer ${token}` };
-
-      const [metricsRes, machinesRes, messagesRes, profileRes] = await Promise.all([
-        fetch(`http://127.0.0.1:8000/api/metrics/?period=${metricsPeriod}`, { headers }),
-        fetch(`http://127.0.0.1:8000/api/machines/`, { headers }),
-        fetch(`http://127.0.0.1:8000/api/recent_messages/`, { headers }), // Твій новий ендпоінт
-        fetch(`http://127.0.0.1:8000/api/profile/`, { headers }) // ДЛЯ ПЕРЕВІРКИ РОЛІ
-      ]);
-
-      if (metricsRes.ok) setMetrics(await metricsRes.json());
-      if (machinesRes.ok) setMachines(await machinesRes.json());
-      if (messagesRes.ok) setMessages(await messagesRes.json());
-      
-      // СИНХРОНІЗАЦІЯ РОЛІ
-      if (profileRes.ok) {
-        const profileData = await profileRes.json();
-        const realRole = profileData.profile.role;
-        const realName = profileData.profile.first_name;
-        
-        if (realRole !== userRole) {
-          setUserRole(realRole);
-          localStorage.setItem('userRole', realRole);
-        }
-        setUserName(realName);
+      if (localStorage.getItem('userRole') === 'admin') {
+        const response = await fetch(`http://127.0.0.1:8000/api/metrics/?period=${metricsPeriod}`, {
+          headers: { 'Authorization': `Bearer ${token}` }
+        });
+        if (response.ok) setMetrics(await response.json());
       }
-
-    } catch (error) {
-      console.error('Error loading dashboard data:', error);
+    } catch (err) {
+      console.error("Failed to fetch metrics:", err);
     } finally {
       setLoading(false);
     }
   };
 
-  // Рахуємо вільні машинки (статус 'free' з твого models.py)
-  const availableMachinesCount = machines.filter((m) => m.status === 'free').length;
-
-  if (loading && !metrics) {
-    return (
-      <div className="h-screen flex items-center justify-center">
-        <Loader2 className="w-10 h-10 animate-spin text-blue-600" />
-      </div>
-    );
-  }
+  useEffect(() => {
+    setUserRole(localStorage.getItem('userRole') || 'student');
+    setUserName(localStorage.getItem('userName') || 'User');
+    fetchMetrics();
+  }, [metricsPeriod]);
 
   return (
-    <div className="p-4 lg:p-8 max-w-7xl mx-auto space-y-8">
+    <div className="p-6 lg:p-10 max-w-7xl mx-auto bg-[#f8fafc] min-h-screen">
       
-      {/* HEADER BANNER */}
-      <div className="relative overflow-hidden bg-gradient-to-r from-blue-600 to-indigo-700 rounded-3xl p-8 text-white shadow-xl">
-        <div className="relative z-10">
-          <span className="px-3 py-1 bg-white/20 backdrop-blur-md rounded-full text-xs font-bold uppercase tracking-wider">
-            {userRole}
-          </span>
-          <h1 className="text-4xl font-black mt-4 mb-2">Hey, {userName}! 👋</h1>
-          <p className="text-blue-100 text-lg opacity-90">Welcome back to your dormitory portal.</p>
+      {/* Header Section */}
+      <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-10 gap-4">
+        <div>
+          <h1 className="text-4xl font-extrabold text-slate-900 tracking-tight">Welcome back, {userName}!</h1>
+          <p className="text-slate-500 font-medium mt-1 flex items-center gap-2">
+            <Activity size={16} className="text-blue-500" />
+            {userRole === 'admin' ? 'Administrator Portal' : 'Student Dashboard'} • Dormitory #1
+          </p>
         </div>
-        <Zap className="absolute right-[-20px] bottom-[-20px] w-64 h-64 text-white/10 rotate-12" />
+        
+        <div className="flex items-center bg-white p-1 rounded-2xl shadow-sm border border-slate-200">
+          <select 
+            value={metricsPeriod}
+            onChange={(e) => setMetricsPeriod(Number(e.target.value))}
+            className="px-4 py-2 bg-slate-900 text-white rounded-xl text-sm font-bold outline-none cursor-pointer hover:bg-slate-800 transition-colors"
+          >
+            <option value={7}>Last 7 Days</option>
+            <option value={30}>Last 30 Days</option>
+            <option value={90}>Last 90 Days</option>
+          </select>
+        </div>
       </div>
 
-      {/* ADMIN ANALYTICS - Показуємо тільки якщо роль admin */}
-      {userRole === 'admin' && (
-        <section className="space-y-4">
-          <div className="flex items-center justify-between">
-            <h2 className="text-2xl font-black flex items-center gap-2">
-              <TrendingUp className="text-blue-600" /> System Analytics
-            </h2>
-            <select
-              value={metricsPeriod}
-              onChange={(e) => setMetricsPeriod(Number(e.target.value))}
-              className="bg-white border-none shadow-sm rounded-xl px-4 py-2 font-bold text-sm"
-            >
-              <option value={7}>Last 7 Days</option>
-              <option value={30}>Last Month</option>
-            </select>
-          </div>
-          
-          {metrics && (
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
-              <MetricCard title="Total Users" value={metrics.totalUsers} sub={metrics.verifiedUsers} label="Verified" icon={<Users />} color="blue" />
-              <MetricCard title="Chat Activity" value={metrics.totalMessages} sub={metrics.recentMessages} label="New" icon={<MessageCircle />} color="purple" />
-              <MetricCard title="Marketplace" value={metrics.totalListings} sub={metrics.activeListings} label="Active" icon={<ShoppingBag />} color="green" />
-              <MetricCard title="Events" value={metrics.totalEvents} sub={metrics.recentEvents} label="Upcoming" icon={<Calendar />} color="pink" />
-            </div>
-          )}
-        </section>
-      )}
-
-      {/* QUICK ACTIONS */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-        <DashboardCard to="/laundry" title="Laundry Room" value={`${availableMachinesCount} Free`} desc="Check machines availability" icon={<WashingMachine />} color="bg-emerald-50 text-emerald-600" />
-        <DashboardCard to="/chat" title="Community Chat" value="Active" desc="Talk with neighbors" icon={<ChatIcon />} color="bg-purple-50 text-purple-600" />
-      </div>
-
-      {/* RECENT MESSAGES FEED */}
-      <div className="bg-white rounded-3xl p-8 shadow-sm border border-gray-100">
-        <h2 className="text-xl font-black mb-6">Community Buzz</h2>
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          {messages.length > 0 ? messages.map((msg) => (
-            <div key={msg.id} className="p-4 rounded-2xl bg-gray-50 hover:bg-gray-100 transition-colors">
-              <div className="flex items-center gap-2 mb-2">
-                <div className="w-6 h-6 bg-indigo-500 rounded-full flex items-center justify-center text-[10px] font-bold text-white">
-                  {msg.sender_name[0]}
-                </div>
-                <span className="text-sm font-bold">{msg.sender_name}</span>
-                <span className="text-[10px] text-gray-400 ml-auto">{msg.timestamp}</span>
+      {/* Top Metrics Grid (System Stats) */}
+      {userRole === 'admin' && metrics && (
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-10">
+          {metrics.stats.map((stat, i) => (
+            <div key={i} className="bg-white p-8 rounded-[2.5rem] border border-slate-100 shadow-sm relative overflow-hidden group hover:shadow-md transition-all">
+              <div className="absolute top-0 right-0 p-6 opacity-5 group-hover:scale-110 transition-transform">
+                {i === 0 ? <Users size={90} /> : i === 1 ? <ShoppingBag size={90} /> : <MessageCircle size={90} />}
+              </div>
+              
+              {/* Force English Labels for Stats */}
+              <p className="text-xs font-black text-slate-400 uppercase tracking-[0.2em]">
+                {i === 0 ? 'Total Students' : i === 1 ? 'Active Ads' : 'Daily Messages'}
+              </p>
+              
+              <div className="flex items-end gap-3 mt-3">
+                <h3 className="text-5xl font-black text-slate-900">{stat.value}</h3>
+                <span className="text-green-500 font-bold text-sm mb-2 flex items-center gap-1">
+                  <TrendingUp size={16} /> Live
+                </span>
               </div>
               <p className="text-sm text-gray-600 italic">"{msg.text}"</p>
             </div>
-          )) : (
-            <div className="col-span-3 text-center py-10 text-gray-400">No recent messages yet</div>
-          )}
+          ))}
         </div>
-      </div>
-    </div>
-  );
-}
+      )}
 
-// Помічники (Cards)
-function MetricCard({ title, value, sub, label, icon, color }: any) {
-    const colors: any = {
-      blue: "text-blue-600 bg-blue-50",
-      purple: "text-purple-600 bg-purple-50",
-      green: "text-green-600 bg-green-50",
-      pink: "text-pink-600 bg-pink-50"
-    };
-    return (
-      <div className="bg-white rounded-3xl p-6 shadow-sm border border-gray-100">
-        <div className="flex items-center justify-between mb-4">
-          <div className={`p-3 rounded-2xl ${colors[color]}`}>{icon}</div>
-          <span className="text-[10px] font-black uppercase text-gray-400">{title}</span>
-        </div>
-        <p className="text-3xl font-black text-gray-900 mb-1">{value}</p>
-        <div className="flex items-center gap-1 text-sm font-bold">
-          <span className="text-green-600">+{sub}</span>
-          <span className="text-gray-400">{label}</span>
-        </div>
+      {/* Main Navigation Cards (Bento Style) */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+        
+        {/* Laundry Card */}
+        <Link to="/laundry" className="group relative bg-gradient-to-br from-emerald-500 to-teal-600 p-8 rounded-[2.5rem] shadow-xl shadow-emerald-200/40 hover:-translate-y-2 transition-all duration-300 overflow-hidden">
+          <div className="relative z-10 text-white">
+            <div className="w-14 h-14 bg-white/20 backdrop-blur-md rounded-2xl flex items-center justify-center mb-6">
+              <WashingMachine className="text-white" size={32} />
+            </div>
+            <h3 className="text-2xl font-bold mb-2">Laundry Room</h3>
+            <p className="text-emerald-50/80 text-sm font-medium mb-8 leading-relaxed">
+              Check machine status and book your slot instantly.
+            </p>
+            <div className="flex items-center gap-2 font-bold text-sm bg-white/20 w-fit px-5 py-2.5 rounded-full backdrop-blur-sm border border-white/10 group-hover:bg-white group-hover:text-emerald-600 transition-all">
+              Check Status <ArrowRight size={16} />
+            </div>
+          </div>
+          <WashingMachine className="absolute -bottom-10 -right-10 text-white/10 rotate-12" size={240} />
+        </Link>
+
+        {/* Marketplace Card */}
+        <Link to="/marketplace" className="group relative bg-gradient-to-br from-blue-500 to-indigo-600 p-8 rounded-[2.5rem] shadow-xl shadow-blue-200/40 hover:-translate-y-2 transition-all duration-300 overflow-hidden">
+          <div className="relative z-10 text-white">
+            <div className="w-14 h-14 bg-white/20 backdrop-blur-md rounded-2xl flex items-center justify-center mb-6">
+              <ShoppingBag className="text-white" size={32} />
+            </div>
+            <h3 className="text-2xl font-bold mb-2">Marketplace</h3>
+            <p className="text-blue-50/80 text-sm font-medium mb-8 leading-relaxed">
+              Find deals or sell items to your dorm community.
+            </p>
+            <div className="flex items-center gap-2 font-bold text-sm bg-white/20 w-fit px-5 py-2.5 rounded-full backdrop-blur-sm border border-white/10 group-hover:bg-white group-hover:text-blue-600 transition-all">
+              Explore Shop <ArrowRight size={16} />
+            </div>
+          </div>
+          <ShoppingBag className="absolute -bottom-10 -right-10 text-white/10 rotate-12" size={240} />
+        </Link>
+
+        {/* Chat Card */}
+        <Link to="/chat" className="group relative bg-gradient-to-br from-purple-500 to-fuchsia-600 p-8 rounded-[2.5rem] shadow-xl shadow-purple-200/40 hover:-translate-y-2 transition-all duration-300 overflow-hidden">
+          <div className="relative z-10 text-white">
+            <div className="w-14 h-14 bg-white/20 backdrop-blur-md rounded-2xl flex items-center justify-center mb-6">
+              <MessageSquare className="text-white" size={32} />
+            </div>
+            <h3 className="text-2xl font-bold mb-2">Dorm Chat</h3>
+            <p className="text-purple-50/80 text-sm font-medium mb-8 leading-relaxed">
+              Chat with residents and stay up to date.
+            </p>
+            <div className="flex items-center gap-2 font-bold text-sm bg-white/20 w-fit px-5 py-2.5 rounded-full backdrop-blur-sm border border-white/10 group-hover:bg-white group-hover:text-purple-600 transition-all">
+              Open Chat <ArrowRight size={16} />
+            </div>
+          </div>
+          <MessageSquare className="absolute -bottom-10 -right-10 text-white/10 rotate-12" size={240} />
+        </Link>
+
       </div>
     );
 }

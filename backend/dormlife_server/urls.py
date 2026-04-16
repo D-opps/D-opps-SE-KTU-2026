@@ -3,50 +3,72 @@ from django.urls import path, include
 from django.conf import settings
 from django.conf.urls.static import static
 from rest_framework.routers import DefaultRouter
+from django.http import JsonResponse
 
-# 1. Імпортуємо в'юшки з додатка api
+# Імпортуємо всі потрібні в'юшки
 from api.views import (
-    GoogleLoginView, MachineViewSet, ProductViewSet, 
-    ProfileView, RegisterView, ConversationViewSet, MessageViewSet
+    GoogleLoginView, 
+    MachineViewSet, 
+    ProductViewSet, 
+    RegisterView, 
+    UserProfileView,
+    ConversationViewSet,  # Додай цей імпорт!
+    MessageViewSet,  # Додай цей імпорт!
+    AdminDashboardView,  # Додай цей імпорт!
+    LatestProductsView,  # Додай цей імпорт!
+    RecentMessagesView  # Додай цей імпорт!
 )
-from rest_framework_simplejwt.views import TokenObtainPairView, TokenRefreshView
 
-# 2. Налаштовуємо роутер
+from rest_framework_simplejwt.views import (
+    TokenObtainPairView,
+    TokenRefreshView,
+)
+def unread_count_stub(request):
+    return JsonResponse({'count': 0})
+
+def notifications_stub(request):
+    return JsonResponse([], safe=False)
+# Створюємо ОДИН роутер і реєструємо всі в'юсети
 router = DefaultRouter()
-router.register(r'machines', MachineViewSet, basename='machine')
-router.register(r'products', ProductViewSet, basename='product')
-router.register(r'conversations', ConversationViewSet, basename='conversation')
-router.register(r'messages', MessageViewSet, basename='message')
+router.register(r'machines', MachineViewSet)
+router.register(r'products', ProductViewSet)
+router.register(r'conversations', ConversationViewSet, basename='conversations')
+router.register(r'messages', MessageViewSet)
 
-# 3. Основні шляхи
 urlpatterns = [
     path('admin/', admin.site.urls),
     
-    # Головний блок API
     path('api/', include([
-        # Маршрути роутера (api/products/, api/machines/, api/conversations/)
+        # Всі маршрути роутера (products, machines, conversations)
         path('', include(router.urls)),
         
-        # Спеціальні ендпоінти для дашборду (тепер вони будуть api/metrics/...)
-        path('metrics/', ConversationViewSet.as_view({'get': 'metrics'})),
-        path('recent_messages/', ConversationViewSet.as_view({'get': 'recent_messages'})),
-        
-        # Авторизація та профіль
+        # Реєстрація та Профіль
         path('register/', RegisterView.as_view(), name='register'),
-        path('profile/', ProfileView.as_view(), name='profile'),
+        path('profile/', UserProfileView.as_view(), name='profile'),
+        
+        # Логін та Токени
         path('token/', TokenObtainPairView.as_view(), name='token_obtain_pair'),
         path('token/refresh/', TokenRefreshView.as_view(), name='token_refresh'),
         path('auth/google/', GoogleLoginView.as_view(), name='google_login'),
         
         # Скидання пароля
         path('password_reset/', include('django_rest_passwordreset.urls', namespace='password_reset')),
-    ])),
+        
+        # Google Auth
+        path('auth/google/', GoogleLoginView.as_view(), name='google_login'),
+        path('admin/metrics/', AdminDashboardView.as_view(), name='admin-metrics'),
+        path('chat/unread-count/', unread_count_stub, name='unread-count'),
+        path('notifications/', notifications_stub, name='notifications'),
+        path('metrics/', AdminDashboardView.as_view(), name='admin-metrics'),
+        path('products/latest/', LatestProductsView.as_view(), name='latest-products'),
+        path('messages/recent/', RecentMessagesView.as_view(), name='recent-messages'),
+
+        ])),
     
-    # Авторизація для інтерфейсу DRF (браузерна версія)
     path('api-auth/', include('rest_framework.urls')),
 ]
 
-# 4. Раздача медіа-файлів
+# Роздача медіа та статики (для фото товарів)
 if settings.DEBUG:
     urlpatterns += static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)
     urlpatterns += static(settings.STATIC_URL, document_root=settings.STATIC_ROOT)
