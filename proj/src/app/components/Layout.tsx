@@ -17,36 +17,36 @@ export function Layout() {
     setUserRole(role);
     
     // Завантажуємо лічильники при вході
-    loadUnreadCounts();
+    // loadUnreadCounts();
     
-    // Опитуємо сервер кожні 30 секунд (Polling)
-    const interval = setInterval(loadUnreadCounts, 30000);
-    return () => clearInterval(interval);
+    // // Опитуємо сервер кожні 30 секунд (Polling)
+    // const interval = setInterval(loadUnreadCounts, 30000);
+    // return () => clearInterval(interval);
   }, []);
 
   // Оновлена функція для роботи з Django
-  const loadUnreadCounts = async () => {
-    try {
-      // 1. Отримуємо кількість непрочитаних повідомлень
-      const msgResponse = await fetch('http://127.0.0.1:8000/api/chat/unread-count/');
-      if (msgResponse.ok) {
-        const data = await msgResponse.json();
-        setUnreadCount(data.count || 0);
-      }
+  // const loadUnreadCounts = async () => {
+  //   try {
+  //     // 1. Отримуємо кількість непрочитаних повідомлень
+  //     const msgResponse = await fetch('http://127.0.0.1:8000/api/chat/unread-count/');
+  //     if (msgResponse.ok) {
+  //       const data = await msgResponse.json();
+  //       setUnreadCount(data.count || 0);
+  //     }
 
-      // 2. Отримуємо сповіщення
-      const notifResponse = await fetch('http://127.0.0.1:8000/api/notifications/');
-      if (notifResponse.ok) {
-        const notifications = await notifResponse.json();
-        // Рахуємо тільки ті, де read === false
-        const unread = notifications.filter((n: any) => !n.read).length;
-        setNotificationCount(unread);
-      }
-    } catch (error) {
-      // Не спамимо помилками в консоль кожні 30 сек, якщо сервер лежить
-      console.warn('Could not fetch badges from Django (backend might be offline)');
-    }
-  };
+  //     // 2. Отримуємо сповіщення
+  //     const notifResponse = await fetch('http://127.0.0.1:8000/api/notifications/');
+  //     if (notifResponse.ok) {
+  //       const notifications = await notifResponse.json();
+  //       // Рахуємо тільки ті, де read === false
+  //       const unread = notifications.filter((n: any) => !n.read).length;
+  //       setNotificationCount(unread);
+  //     }
+  //   } catch (error) {
+  //     // Не спамимо помилками в консоль кожні 30 сек, якщо сервер лежить
+  //     console.warn('Could not fetch badges from Django (backend might be offline)');
+  //   }
+  // };
 
   const handleLogout = () => {
     // Очищаємо все
