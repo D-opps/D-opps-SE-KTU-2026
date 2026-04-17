@@ -9,11 +9,12 @@ class UserSerializer(serializers.ModelSerializer):
         model = User
         fields = ['id', 'username', 'email', 'first_name', 'role', 'dormitory', 'room_number', 'photo']
 
+# serializers.py
 class MachineSerializer(serializers.ModelSerializer):
     class Meta:
         model = Machine
-        fields = '__all__'
-
+        # Прибрали location, додали dormitory
+        fields = ['id', 'name', 'type', 'status', 'time_left', 'dormitory', 'notes', 'reported_by']
 class ProductPhotoSerializer(serializers.ModelSerializer):
     class Meta:
         model = ProductPhoto

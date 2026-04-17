@@ -23,9 +23,57 @@ from rest_framework.parsers import MultiPartParser, FormParser
 User = get_user_model()
 
 class MachineViewSet(viewsets.ModelViewSet):
-    queryset = Machine.objects.all()
     serializer_class = MachineSerializer
-    permission_classes = [permissions.AllowAny]
+    permission_classes = [permissions.IsAuthenticated] # Базовий захист
+
+    def get_queryset(self):
+        user = self.request.user
+        # Авто-звільнення машинок, у яких вийшов час
+        from django.utils import timezone
+        Machine.objects.filter(
+            status='occupied', 
+            end_time__lte=timezone.now()
+        ).update(status='free', end_time=None)
+
+        # Фільтрація: тільки машинки МОГО гуртожитку
+        return Machine.objects.filter(dormitory=user.dormitory)
+
+    @action(detail=True, methods=['post'])
+    def report_status(self, request, pk=None):
+        machine = self.get_object()
+        new_status = request.data.get('status')
+        notes = request.data.get('notes', '')
+
+        # Перевірка на валідність статусу
+        valid_statuses = ['free', 'occupied', 'out-of-order']
+        if new_status not in valid_statuses:
+            return Response({'error': 'Invalid status'}, status=status.HTTP_400_BAD_REQUEST)
+
+        # 1. Оновлюємо базові поля для аудиту
+        machine.status = new_status
+        machine.notes = notes
+        machine.reported_by = request.user
+        machine.last_reported_at = timezone.now()
+
+        # 2. Логіка таймера
+        if new_status == 'occupied':
+            # Беремо хвилини з запиту, або 30 за дефолтом
+            try:
+                minutes = int(request.data.get('minutes', 30))
+            except (ValueError, TypeError):
+                minutes = 30
+            machine.end_time = timezone.now() + timedelta(minutes=minutes)
+        
+        elif new_status == 'free':
+            # Якщо вільна — скидаємо час завершення
+            machine.end_time = None
+            machine.notes = '' # Очищаємо нотатки, якщо машинку полагодили/звільнили
+
+        machine.save()
+        
+        # Повертаємо оновлені дані, щоб фронтенд відразу їх побачив
+        serializer = self.get_serializer(machine)
+        return Response(serializer.data)
 
 class ProductViewSet(viewsets.ModelViewSet):
     queryset = Product.objects.all()

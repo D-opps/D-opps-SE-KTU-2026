@@ -1,6 +1,9 @@
 from django.db import models
 from django.contrib.auth.models import AbstractUser
 import uuid
+from django.db import models
+from django.conf import settings
+from django.utils import timezone
 
 class User(AbstractUser):
     ROLE_CHOICES = (
@@ -30,15 +33,39 @@ class Product(models.Model):
 
 class Machine(models.Model):
     TYPE_CHOICES = (('washer', 'Washer'), ('dryer', 'Dryer'))
-    STATUS_CHOICES = (('free', 'Free'), ('occupied', 'Occupied'), ('out-of-order', 'Out of order'))
+    STATUS_CHOICES = (
+        ('free', 'Free'), 
+        ('occupied', 'Occupied'), 
+        ('out-of-order', 'Out of order')
+    )
     
     name = models.CharField(max_length=50)
     type = models.CharField(max_length=10, choices=TYPE_CHOICES)
     status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='free')
-    time_left = models.IntegerField(default=0)
+    location = models.CharField(max_length=100) # Назва (н-р: "2 поверх")
+    
+    # ЦЕ ПОЛЕ ОБОВ'ЯЗКОВЕ ДЛЯ ФІЛЬТРАЦІЇ:
+    dormitory = models.IntegerField() 
+    
+    end_time = models.DateTimeField(null=True, blank=True)
+    notes = models.TextField(blank=True, null=True)
+    
+    # Для аудиту:
+    reported_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL, 
+        on_delete=models.SET_NULL, 
+        null=True, 
+        blank=True
+    )
+    last_reported_at = models.DateTimeField(auto_now=True)
 
-    def __str__(self):
-        return self.name
+    @property
+    def time_left(self):
+        if self.status == 'occupied' and self.end_time:
+            from django.utils import timezone
+            diff = self.end_time - timezone.now()
+            return max(0, int(diff.total_seconds() / 60))
+        return 0
     
 class ProductPhoto(models.Model):
     product = models.ForeignKey(Product, related_name='photos', on_delete=models.CASCADE)
