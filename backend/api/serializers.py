@@ -56,13 +56,19 @@ class MessageSerializer(serializers.ModelSerializer):
         fields = ['id', 'conversation', 'sender', 'sender_name', 'text', 'is_read', 'timestamp']
 class ConversationSerializer(serializers.ModelSerializer):
     messages = MessageSerializer(many=True, read_only=True)
-    # Важливо: витягуємо назву товару прямо в список чатів
     product_title = serializers.ReadOnlyField(source='product.title')
+    
+    # ДОДАЙ ЦЕЙ РЯДОК:
+    # Це дозволить створювати чати без прив'язки до товару (для пошуку та гуртожитків)
+    product = serializers.PrimaryKeyRelatedField(
+        queryset=Product.objects.all(), 
+        required=False, 
+        allow_null=True
+    )
     
     class Meta:
         model = Conversation
         fields = ['id', 'type', 'participants', 'product', 'product_title', 'dormitory_number', 'messages', 'created_at']
-
 class ExchangeOfferSerializer(serializers.ModelSerializer):
     sender_name = serializers.ReadOnlyField(source='sender.first_name')
     target_product_title = serializers.ReadOnlyField(source='target_product.title')
