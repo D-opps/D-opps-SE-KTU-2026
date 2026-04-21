@@ -210,15 +210,21 @@ class ConversationViewSet(viewsets.ModelViewSet):
     @action(detail=False, methods=['get'])
     def dormitory_chat(self, request):
         user = request.user
-        if not user.dormitory:
-            return Response({"error": "User has no dormitory assigned"}, status=400)
+        if not user.dormitory: # Перевір, чи поле називається dormitory чи dormitory_number у твоїй моделі User
+            return Response({"error": "Гуртожиток не вказано"}, status=400)
 
-        # Шукаємо чат саме для цього номера гуртожитку
-        conversation, created = Conversation.objects.get_or_create(
+        # Знаходимо або створюємо чат
+        chat, created = Conversation.objects.get_or_create(
             type='group',
-            dormitory_number=user.dormitory,
-            defaults={'product': None}
+            dormitory_number=user.dormitory # Або user.dormitory_number
         )
+        
+        # Додаємо юзера до учасників, якщо його там немає
+        if user not in chat.participants.all():
+            chat.participants.add(user)
+
+        serializer = self.get_serializer(chat)
+        return Response(serializer.data) # ЦЕЙ РЯДОК МАЄ БУТИ ОБОВ'ЯЗКОВО  
     @action(detail=False, methods=['get'])
     def metrics(self, request):
         user = request.user
