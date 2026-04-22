@@ -78,25 +78,43 @@ class ProductPhoto(models.Model):
 
 class Conversation(models.Model):
     TYPE_CHOICES = (
-        ('private', 'Private (Marketplace)'), # Чат між покупцем і продавцем
-        ('group', 'Dormitory Group'),          # Загальний чат гуртожитку
-        ('admin', 'Admin Support'),            # Чат з адміністрацією
+        ('private', 'Private Chat'),       # Звичайний чат між юзерами
+        ('market', 'Marketplace'),         # Чат по товару
+        ('group', 'Dormitory Group'),      # Гуртожиток
+        ('admin', 'Admin Support'),        # Підтримка
     )
     
-    type = models.CharField(max_length=10, choices=TYPE_CHOICES, default='private')
+    type = models.CharField(
+        max_length=10, 
+        choices=TYPE_CHOICES, 
+        default='private'
+    )
     participants = models.ManyToManyField(User, related_name='conversations')
     
-    # Для Marketplace чатів залишаємо прив'язку до товару
-    product = models.ForeignKey(Product, on_delete=models.SET_NULL, null=True, blank=True)
+    # null=True та blank=True дозволяють створювати чати БЕЗ товару
+    product = models.ForeignKey(
+        'Product', # Використовуємо рядок, якщо модель Product нижче або в іншому файлі
+        on_delete=models.SET_NULL, 
+        null=True, 
+        blank=True,
+        related_name='conversations'
+    )
     
-    # Для групових чатів — прив'язка до номера гуртожитку
     dormitory_number = models.IntegerField(null=True, blank=True) 
-    
     created_at = models.DateTimeField(auto_now_add=True)
 
-    def __str__(self):
-        return f"{self.type} - {self.product.title if self.product else self.dormitory_number}"
+    class Meta:
+        ordering = ['-created_at']
 
+    def __str__(self):
+        if self.type == 'market' and self.product:
+            return f"Market: {self.product.title}"
+        if self.type == 'group':
+            return f"Dormitory №{self.dormitory_number}"
+        
+        # Для приватних чатів виводимо список учасників
+        usernames = ", ".join([u.username for u in self.participants.all()[:2]])
+        return f"Private: {usernames}"
 class Message(models.Model):
     conversation = models.ForeignKey(Conversation, on_delete=models.CASCADE, related_name='messages')
     sender = models.ForeignKey(User, on_delete=models.CASCADE)
