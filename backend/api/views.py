@@ -13,7 +13,7 @@ from .serializers import (
 )
 from rest_framework.views import APIView
 import requests
-from rest_framework.decorators import action
+from rest_framework.decorators import action, api_view
 from django.utils import timezone
 from datetime import timedelta
 from django.db.models import Count
@@ -21,7 +21,11 @@ from rest_framework import generics
 from rest_framework.parsers import MultiPartParser, FormParser
 
 User = get_user_model()
-
+# views.py
+@api_view(['GET'])
+def get_me(request):
+    serializer = UserSerializer(request.user)
+    return Response(serializer.data)
 class MachineViewSet(viewsets.ModelViewSet):
     serializer_class = MachineSerializer
     permission_classes = [permissions.IsAuthenticated] # Базовий захист
@@ -174,108 +178,131 @@ class ConversationViewSet(viewsets.ModelViewSet):
         return Conversation.objects.filter(participants=self.request.user).distinct()
 
     def create(self, request, *args, **kwargs):
-        product_id = request.data.get('product_id')
-        # Ми можемо отримати receiver_id або витягнути його прямо з продукту
-        receiver_id = request.data.get('receiver_id')
-        
-        if not product_id:
-            return Response({"error": "product_id is required"}, status=400)
-
-        try:
-            product = Product.objects.get(id=product_id)
-            seller = product.seller
+            product_id = request.data.get('product_id')
+            username = request.data.get('username')
             
-            if seller == request.user:
-                return Response({"error": "You cannot start a conversation with yourself"}, status=400)
+            # --- СЦЕНАРІЙ 1: ЧАТ ПО ТОВАРУ (Маркетплейс) ---
+            if product_id:
+                try:
+                    product = Product.objects.get(id=product_id)
+                    opponent = product.seller # Юзер — це продавець товару
+                    
+                    if opponent == request.user:
+                        return Response({"error": "You cannot start a conversation with yourself"}, status=400)
 
-            # Шукаємо існуючий чат між цими двома людьми щодо цього продукту
-            conversation = Conversation.objects.filter(
-                participants=request.user
-            ).filter(
-                participants=seller
-            ).filter(product=product).first()
+                    # Шукаємо існуючий чат по цьому продукту
+                    conversation = Conversation.objects.filter(
+                        product=product,
+                        participants=request.user
+                    ).filter(participants=opponent).first()
 
-            if not conversation:
-                # Якщо чату немає — створюємо
-                conversation = Conversation.objects.create(product=product)
-                conversation.participants.add(request.user, seller)
+                    if not conversation:
+                        conversation = Conversation.objects.create(product=product, type='private')
+                        conversation.participants.add(request.user, opponent)
 
-            serializer = self.get_serializer(conversation)
-            return Response(serializer.data, status=201)
+                    serializer = self.get_serializer(conversation)
+                    return Response(serializer.data, status=201)
+                
+                except Product.DoesNotExist:
+                    return Response({"error": "Product not found"}, status=404)
 
-        except Product.DoesNotExist:
-            return Response({"error": "Product not found"}, status=404)
-        except Exception as e:
-            return Response({"error": str(e)}, status=400)
+            # --- СЦЕНАРІЙ 2: ПРИВАТНИЙ ЧАТ (Пошук за іменем) ---
+            elif username:
+                opponent = User.objects.filter(
+                    Q(username__iexact=username) | Q(email__iexact=username)
+                ).first()
+
+                if not opponent:
+                    # Ось тут вилітає твоя помилка. Перевір, чи є юзер з таким ім'ям в БД!
+                    return Response({"error": "User not found"}, status=404)
+                
+                if opponent == request.user:
+                    return Response({"error": "You cannot chat with yourself"}, status=400)
+
+                # Шукаємо чат без продукту
+                conversation = Conversation.objects.filter(
+                    product__isnull=True,
+                    type='private',
+                    participants=request.user
+                ).filter(participants=opponent).first()
+
+                if not conversation:
+                    conversation = Conversation.objects.create(type='private')
+                    conversation.participants.add(request.user, opponent)
+
+                serializer = self.get_serializer(conversation)
+                return Response(serializer.data, status=201)
+
+            return Response({"error": "Send product_id or username"}, status=400)
     @action(detail=False, methods=['get'])
     def dormitory_chat(self, request):
-        user = request.user
-        if not user.dormitory: # Перевір, чи поле називається dormitory чи dormitory_number у твоїй моделі User
-            return Response({"error": "Гуртожиток не вказано"}, status=400)
+            user = request.user
+            if not user.dormitory: # Перевір, чи поле називається dormitory чи dormitory_number у твоїй моделі User
+                return Response({"error": "Гуртожиток не вказано"}, status=400)
 
-        # Знаходимо або створюємо чат
-        chat, created = Conversation.objects.get_or_create(
-            type='group',
-            dormitory_number=user.dormitory # Або user.dormitory_number
-        )
-        
-        # Додаємо юзера до учасників, якщо його там немає
-        if user not in chat.participants.all():
-            chat.participants.add(user)
+            # Знаходимо або створюємо чат
+            chat, created = Conversation.objects.get_or_create(
+                type='group',
+                dormitory_number=user.dormitory # Або user.dormitory_number
+            )
+            
+            # Додаємо юзера до учасників, якщо його там немає
+            if user not in chat.participants.all():
+                chat.participants.add(user)
 
-        serializer = self.get_serializer(chat)
-        return Response(serializer.data) # ЦЕЙ РЯДОК МАЄ БУТИ ОБОВ'ЯЗКОВО  
+            serializer = self.get_serializer(chat)
+            return Response(serializer.data) # ЦЕЙ РЯДОК МАЄ БУТИ ОБОВ'ЯЗКОВО  
     @action(detail=False, methods=['get'])
     def metrics(self, request):
-        user = request.user
-        # Отримуємо період з параметрів запиту (дефолт 7 днів)
-        period = int(request.query_params.get('period', 7))
-        date_from = timezone.now() - timedelta(days=period)
-        
-        # Визначаємо гуртожиток користувача
-        user_dorm = getattr(user, 'dormitory', None)
+            user = request.user
+            # Отримуємо період з параметрів запиту (дефолт 7 днів)
+            period = int(request.query_params.get('period', 7))
+            date_from = timezone.now() - timedelta(days=period)
+            
+            # Визначаємо гуртожиток користувача
+            user_dorm = getattr(user, 'dormitory', None)
 
-        # Якщо у користувача не вказано гуртожиток, можна або видати помилку, 
-        # або (якщо це СуперАдмін) показати все.
-        if not user_dorm:
-            return Response({"error": "No dormitory assigned to user"}, status=400)
+            # Якщо у користувача не вказано гуртожиток, можна або видати помилку, 
+            # або (якщо це СуперАдмін) показати все.
+            if not user_dorm:
+                return Response({"error": "No dormitory assigned to user"}, status=400)
 
-        # Фільтруємо всі дані за гуртожитком
-        # Припускаємо, що у моделей User та Product є поле dormitory
-        # А у Message та Machine можна вийти через зв'язки
+            # Фільтруємо всі дані за гуртожитком
+            # Припускаємо, що у моделей User та Product є поле dormitory
+            # А у Message та Machine можна вийти через зв'язки
         
-        return Response({
-            "totalUsers": User.objects.filter(dormitory=user_dorm).count(),
-            "verifiedUsers": User.objects.filter(dormitory=user_dorm, is_active=True).count(),
-            
-            "totalMessages": Message.objects.filter(
-                conversation__dormitory_number=user_dorm # якщо в конверсації є номер дорму
-            ).count(),
-            
-            "totalListings": Product.objects.filter(seller__dormitory=user_dorm).count(),
-            "activeListings": Product.objects.filter(
-                seller__dormitory=user_dorm, 
-                status='available'
-            ).count(),
-            
-            "dormitoryNumber": user_dorm # Повертаємо номер для заголовка на фронті
-        })
+            return Response({
+                "totalUsers": User.objects.filter(dormitory=user_dorm).count(),
+                "verifiedUsers": User.objects.filter(dormitory=user_dorm, is_active=True).count(),
+                
+                "totalMessages": Message.objects.filter(
+                    conversation__dormitory_number=user_dorm # якщо в конверсації є номер дорму
+                ).count(),
+                
+                "totalListings": Product.objects.filter(seller__dormitory=user_dorm).count(),
+                "activeListings": Product.objects.filter(
+                    seller__dormitory=user_dorm, 
+                    status='available'
+                ).count(),
+                
+                "dormitoryNumber": user_dorm # Повертаємо номер для заголовка на фронті
+            })
 
     # views.py у класі ConversationViewSet або окремим методом
     @action(detail=False, methods=['get'])
     def recent_messages(self, request):
-        # Фільтруємо повідомлення: тільки ті, де користувач є учасником чату
-        messages = Message.objects.filter(
-            conversation__participants=request.user
-        ).order_by('-created_at')[:3]
-        
-        data = [{
-            "id": m.id,
-            "sender_name": m.sender.first_name or m.sender.username,
-            "text": m.text,
-            "timestamp": m.created_at.strftime("%H:%M")
-        } for m in messages]
-        return Response(data)
+            # Фільтруємо повідомлення: тільки ті, де користувач є учасником чату
+            messages = Message.objects.filter(
+                conversation__participants=request.user
+            ).order_by('-created_at')[:3]
+            
+            data = [{
+                "id": m.id,
+                "sender_name": m.sender.first_name or m.sender.username,
+                "text": m.text,
+                "timestamp": m.created_at.strftime("%H:%M")
+            } for m in messages]
+            return Response(data)
 
 class MessageViewSet(viewsets.ModelViewSet):
     serializer_class = MessageSerializer

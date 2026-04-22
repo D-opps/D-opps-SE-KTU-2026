@@ -55,20 +55,54 @@ class MessageSerializer(serializers.ModelSerializer):
         model = Message
         fields = ['id', 'conversation', 'sender', 'sender_name', 'text', 'is_read', 'timestamp']
 class ConversationSerializer(serializers.ModelSerializer):
+    
     messages = MessageSerializer(many=True, read_only=True)
     product_title = serializers.ReadOnlyField(source='product.title')
-    
-    # ДОДАЙ ЦЕЙ РЯДОК:
-    # Це дозволить створювати чати без прив'язки до товару (для пошуку та гуртожитків)
-    product = serializers.PrimaryKeyRelatedField(
-        queryset=Product.objects.all(), 
-        required=False, 
-        allow_null=True
-    )
-    
+    #product_id = serializers.IntegerField(required=False, allow_null=True)
+    #participants = UserSerializer(many=True, read_only=True)
+    #receiver_id = serializers.CharField(required=False, allow_null=True)
+
+    product_id = serializers.IntegerField(required=False, allow_null=True, write_only=True)
+    username = serializers.CharField(required=False, allow_null=True, write_only=True)
+    receiver_id = serializers.CharField(required=False, allow_null=True, write_only=True)
+    participants = UserSerializer(many=True, read_only=True)
     class Meta:
         model = Conversation
-        fields = ['id', 'type', 'participants', 'product', 'product_title', 'dormitory_number', 'messages', 'created_at']
+        fields = ['id', 'type', 'participants', 'product', 'product_title', 'dormitory_number', 'messages', 'created_at', 'product_id', 'receiver_id', 'username']
+    def create(self, validated_data):
+        # 1. Видаляємо допоміжні поля з validated_data, щоб вони не потрапили в Conversation.objects.create()
+        username = validated_data.pop('username', None)
+        receiver_id = validated_data.pop('receiver_id', None)
+        product_id = validated_data.pop('product_id', None)
+
+        # 2. Отримуємо поточного користувача (відправника)
+        request = self.context.get('request')
+        current_user = request.user
+
+        # 3. Створюємо саму бесіду
+        conversation = Conversation.objects.create(**validated_data)
+
+        # 4. Логіка додавання учасників
+        participants = [current_user]
+        
+        # Шукаємо отримувача за ID або за Username
+        if receiver_id:
+            from django.contrib.auth import get_user_model
+            User = get_user_model()
+            receiver = User.objects.filter(id=receiver_id).first()
+            if receiver:
+                participants.append(receiver)
+        elif username:
+            from django.contrib.auth import get_user_model
+            User = get_user_model()
+            receiver = User.objects.filter(username=username).first()
+            if receiver:
+                participants.append(receiver)
+
+        # Додаємо всіх учасників у ManyToMany поле
+        conversation.participants.set(participants)
+
+        return conversation
 class ExchangeOfferSerializer(serializers.ModelSerializer):
     sender_name = serializers.ReadOnlyField(source='sender.first_name')
     target_product_title = serializers.ReadOnlyField(source='target_product.title')
