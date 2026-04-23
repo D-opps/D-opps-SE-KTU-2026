@@ -82,6 +82,7 @@ class Conversation(models.Model):
         ('market', 'Marketplace'),         # Чат по товару
         ('group', 'Dormitory Group'),      # Гуртожиток
         ('admin', 'Admin Support'),        # Підтримка
+        ('global', 'Global Chat') 
     )
     
     type = models.CharField(

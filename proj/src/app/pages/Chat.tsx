@@ -43,51 +43,37 @@ export function Chat() {
     }
   };
 
-  // SEARCH / CREATE CHAT
-const handleStartNewChat = async (e: React.FormEvent) => {
-  e.preventDefault();
-  
-  if (!searchUsername.trim()) return;
+  const handleStartNewChat = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!searchUsername.trim()) return;
 
-  try {
-    const res = await axios.post(`${BASE_URL}/api/conversations/`, {
-      username: searchUsername.trim(),
-      type: 'private',
-      // Якщо бекенд не приймає null, спробуйте взагалі видалити це поле 
-      // або уточніть у розробника бекенду, який параметр є обов'язковим
-      product_id: null 
-    }, {
-      headers: { Authorization: `Bearer ${token}` }
-    });
-
-    setSearchUsername('');
-    fetchConversations();
-    navigate(`/chat/${res.data.id}`);
-    toast.success("Chat created");
-  } catch (err: any) {
-    // Це допоможе вам побачити реальну причину в консолі
-    console.error("Full error response:", err.response?.data);
-    
-    const serverError = err.response?.data?.product_id 
-      ? "Product ID is missing (Backend restriction)" 
-      : err.response?.data?.error;
-      
-    toast.error(serverError || "User not found");
-  }
-};
-
-  // DELETE CHAT
-  const handleDeleteChat = async (id: string | number) => {
-    if (!window.confirm("Are you sure you want to delete this chat?")) return;
     try {
-      await axios.delete(`${BASE_URL}/api/conversations/${id}/`, {
+      const res = await axios.post(`${BASE_URL}/api/conversations/`, {
+        username: searchUsername.trim(),
+        type: 'private',
+        product_id: null 
+      }, {
         headers: { Authorization: `Bearer ${token}` }
       });
-      setConversations(prev => prev.filter(c => c.id !== id));
-      if (chatId === String(id)) navigate('/chat');
-      toast.success("Chat deleted");
+
+      setSearchUsername('');
+      fetchConversations();
+      navigate(`/chat/${res.data.id}`);
+      toast.success("Chat created");
+    } catch (err: any) {
+      toast.error(err.response?.data?.error || "User not found");
+    }
+  };
+
+  const handleGlobalChat = async () => {
+    try {
+      const res = await axios.get(`${BASE_URL}/api/conversations/global_chat/`, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      navigate(`/chat/${res.data.id}`);
+      fetchConversations();
     } catch (err) {
-      toast.error("Failed to delete chat");
+      toast.error("Failed to access global chat");
     }
   };
 
@@ -100,6 +86,20 @@ const handleStartNewChat = async (e: React.FormEvent) => {
       fetchConversations();
     } catch (err) {
       toast.error("Failed to access dormitory chat");
+    }
+  };
+
+  const handleDeleteChat = async (id: string | number) => {
+    if (!window.confirm("Are you sure you want to delete this chat?")) return;
+    try {
+      await axios.delete(`${BASE_URL}/api/conversations/${id}/`, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      setConversations(prev => prev.filter(c => c.id !== id));
+      if (chatId === String(id)) navigate('/chat');
+      toast.success("Chat deleted");
+    } catch (err) {
+      toast.error("Failed to delete chat");
     }
   };
 
@@ -136,10 +136,10 @@ const handleStartNewChat = async (e: React.FormEvent) => {
       {/* SIDEBAR */}
       <aside className={`w-full lg:w-80 border-r flex flex-col ${chatId ? 'hidden lg:flex' : 'flex'}`}>
         <div className="p-6 border-b">
-          <h1 className="text-2xl font-black italic uppercase tracking-tighter">Messenger</h1>
+          <h1 className="text-2xl font-black italic uppercase tracking-tighter text-blue-600">Messenger</h1>
         </div>
         
-        <div className="p-3">
+        <div className="p-3 space-y-2">
           <form onSubmit={handleStartNewChat} className="relative mb-3">
             <input 
               type="text" 
@@ -152,6 +152,14 @@ const handleStartNewChat = async (e: React.FormEvent) => {
               <Search size={18}/>
             </button>
           </form>
+
+          {/* GLOBAL CHAT BUTTON */}
+          <button 
+            onClick={handleGlobalChat}
+            className="w-full p-4 rounded-2xl bg-gradient-to-r from-purple-600 to-indigo-700 text-white font-bold flex items-center gap-3 shadow-lg hover:shadow-purple-200 transition-all"
+          >
+            <MessageSquare size={20}/> Global Chat
+          </button>
 
           <button 
             onClick={handleDormitoryChat}
@@ -176,7 +184,9 @@ const handleStartNewChat = async (e: React.FormEvent) => {
                   }`}
                 >
                   <span className="font-bold truncate text-sm pr-6">
-                    {conv.type === 'group' ? `Dormitory №${conv.dormitory_number}` : (conv.product_title || 'Direct Message')}
+                    {conv.type === 'group' 
+                      ? `Dormitory №${conv.dormitory_number}` 
+                      : (conv.display_name || conv.product_title || 'Direct Message')}
                   </span>
                   <span className={`text-[10px] uppercase font-black opacity-50 ${chatId === String(conv.id) ? 'text-white' : 'text-blue-600'}`}>
                     {conv.type}
@@ -207,11 +217,12 @@ const handleStartNewChat = async (e: React.FormEvent) => {
                   <ArrowLeft size={20}/>
                 </button>
                 <div className="w-10 h-10 bg-blue-600 rounded-xl flex items-center justify-center text-white font-black text-lg">
-                  {currentChat.product_title ? currentChat.product_title[0].toUpperCase() : 'C'}
+                  {/* SAFE INITIALS */}
+                  {(currentChat?.display_name?.[0] || currentChat?.product_title?.[0] || 'C').toUpperCase()}
                 </div>
                 <div>
                   <h2 className="font-black uppercase text-xs tracking-widest text-gray-900 leading-none mb-1">
-                    {currentChat.product_title || 'Private Chat'}
+                    {currentChat?.display_name || currentChat?.product_title || 'Private Chat'}
                   </h2>
                   <p className="text-[10px] text-green-500 font-bold uppercase">Online</p>
                 </div>
