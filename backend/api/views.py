@@ -303,6 +303,23 @@ class ConversationViewSet(viewsets.ModelViewSet):
                 "timestamp": m.created_at.strftime("%H:%M")
             } for m in messages]
             return Response(data)
+    @action(detail=False, methods=['get'])
+    def global_chat(self, request):
+        # Використовуємо тільки ті поля, які є в моделі.
+        # Якщо 'name' немає, ми можемо ідентифікувати глобальний чат просто за типом.
+        conv, created = Conversation.objects.get_or_create(
+            type='GLOBAL',
+            # Якщо у тебе немає поля для назви, просто прибери defaults або 
+            # використай існуюче поле, наприклад product_title (якщо це допустимо)
+            #defaults={'product_title': 'Global Student Chat'} 
+        )
+        
+        # Додаємо користувача до чату
+        if request.user not in conv.participants.all():
+            conv.participants.add(request.user)
+            
+        serializer = self.get_serializer(conv)
+        return Response(serializer.data)
 
 class MessageViewSet(viewsets.ModelViewSet):
     serializer_class = MessageSerializer
