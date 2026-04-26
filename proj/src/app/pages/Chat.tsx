@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router';
-import { Send, MessageSquare, ArrowLeft, Loader2, Building2, Trash2, Search } from 'lucide-react';
+import { Send, ArrowLeft, Loader2, Globe, Building2, Trash2, Bell } from 'lucide-react';
 import axios from 'axios';
 import { toast } from 'sonner';
 
@@ -10,7 +10,6 @@ export function Chat() {
   const [conversations, setConversations] = useState<any[]>([]);
   const [currentChat, setCurrentChat] = useState<any>(null);
   const [newMessage, setNewMessage] = useState('');
-  const [searchUsername, setSearchUsername] = useState('');
   const [loading, setLoading] = useState(true);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
@@ -25,7 +24,7 @@ export function Chat() {
       });
       setConversations(res.data);
     } catch (err) {
-      console.error(err);
+      console.error("Помилка завантаження чатів", err);
     } finally {
       setLoading(false);
     }
@@ -43,66 +42,6 @@ export function Chat() {
     }
   };
 
-  const handleStartNewChat = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!searchUsername.trim()) return;
-
-    try {
-      const res = await axios.post(`${BASE_URL}/api/conversations/`, {
-        username: searchUsername.trim(),
-        type: 'private',
-        product_id: null 
-      }, {
-        headers: { Authorization: `Bearer ${token}` }
-      });
-
-      setSearchUsername('');
-      fetchConversations();
-      navigate(`/chat/${res.data.id}`);
-      toast.success("Chat created");
-    } catch (err: any) {
-      toast.error(err.response?.data?.error || "User not found");
-    }
-  };
-
-  const handleGlobalChat = async () => {
-    try {
-      const res = await axios.get(`${BASE_URL}/api/conversations/global_chat/`, {
-        headers: { Authorization: `Bearer ${token}` }
-      });
-      navigate(`/chat/${res.data.id}`);
-      fetchConversations();
-    } catch (err) {
-      toast.error("Failed to access global chat");
-    }
-  };
-
-  const handleDormitoryChat = async () => {
-    try {
-      const res = await axios.get(`${BASE_URL}/api/conversations/dormitory_chat/`, {
-        headers: { Authorization: `Bearer ${token}` }
-      });
-      navigate(`/chat/${res.data.id}`);
-      fetchConversations();
-    } catch (err) {
-      toast.error("Failed to access dormitory chat");
-    }
-  };
-
-  const handleDeleteChat = async (id: string | number) => {
-    if (!window.confirm("Are you sure you want to delete this chat?")) return;
-    try {
-      await axios.delete(`${BASE_URL}/api/conversations/${id}/`, {
-        headers: { Authorization: `Bearer ${token}` }
-      });
-      setConversations(prev => prev.filter(c => c.id !== id));
-      if (chatId === String(id)) navigate('/chat');
-      toast.success("Chat deleted");
-    } catch (err) {
-      toast.error("Failed to delete chat");
-    }
-  };
-
   const handleSendMessage = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!newMessage.trim() || !chatId) return;
@@ -115,91 +54,163 @@ export function Chat() {
       });
       setNewMessage('');
       fetchCurrentChat();
+      fetchConversations();
     } catch (err) {
-      toast.error("Failed to send message");
+      toast.error("Помилка відправки");
     }
   };
 
-  useEffect(() => { fetchConversations(); }, []);
-  useEffect(() => { 
+  // ✅ ВИДАЛЕННЯ ЧАТУ
+  const handleDeleteChat = async (conversationId: number) => {
+    try {
+      await axios.delete(`${BASE_URL}/api/conversations/${conversationId}/`, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+
+      toast.success("Чат видалено");
+
+      if (chatId === String(conversationId)) {
+        navigate("/chat");
+        setCurrentChat(null);
+      }
+
+      fetchConversations();
+    } catch (err) {
+      toast.error("Не вдалося видалити чат");
+      console.error(err);
+    }
+  };
+
+  // ПЕРЕХІД В ГЛОБАЛ ТА ДОРМ
+const goToSpecialChat = async (type: 'global' | 'dormitory') => {
+  const backendType = type === 'global' ? 'global' : 'dormitory';
+
+  const existingChat = conversations.find(c => c.type === backendType);
+
+  if (existingChat) {
+    navigate(`/chat/${existingChat.id}`);
+  } else {
+    try {
+      const res = await axios.post(`${BASE_URL}/api/conversations/`, {
+        type: backendType,
+      }, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+
+      await fetchConversations();
+      navigate(`/chat/${res.data.id}`);
+    } catch (err: any) {
+      console.error("Деталі помилки:", err.response?.data);
+      toast.error("Не вдалося створити чат");
+    }
+  }
+};
+  useEffect(() => {
+    fetchConversations();
+    const i = setInterval(fetchConversations, 4000);
+    return () => clearInterval(i);
+  }, []);
+
+  useEffect(() => {
     if (chatId) {
       fetchCurrentChat();
-      const interval = setInterval(fetchCurrentChat, 5000);
-      return () => clearInterval(interval);
+      const i = setInterval(fetchCurrentChat, 3000);
+      return () => clearInterval(i);
     }
   }, [chatId]);
 
-  useEffect(() => { messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' }); }, [currentChat?.messages]);
+  useEffect(() => {
+    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+  }, [currentChat?.messages]);
 
   return (
-    <div className="flex h-[calc(100vh-64px)] bg-white overflow-hidden">
-      {/* SIDEBAR */}
+    <div className="flex h-[calc(100vh-64px)] bg-white overflow-hidden text-gray-900">
       <aside className={`w-full lg:w-80 border-r flex flex-col ${chatId ? 'hidden lg:flex' : 'flex'}`}>
-        <div className="p-6 border-b">
+        <div className="p-6 border-b flex justify-between items-center">
           <h1 className="text-2xl font-black italic uppercase tracking-tighter text-blue-600">Messenger</h1>
-        </div>
-        
-        <div className="p-3 space-y-2">
-          <form onSubmit={handleStartNewChat} className="relative mb-3">
-            <input 
-              type="text" 
-              placeholder="Search by username..." 
-              value={searchUsername}
-              onChange={(e) => setSearchUsername(e.target.value)}
-              className="w-full p-3 pr-10 bg-gray-50 border border-gray-100 rounded-2xl text-sm outline-none focus:ring-2 focus:ring-blue-500/20 transition-all"
-            />
-            <button type="submit" className="absolute right-3 top-1/2 -translate-y-1/2 text-blue-600 hover:scale-110 transition-transform">
-              <Search size={18}/>
-            </button>
-          </form>
-
-          {/* GLOBAL CHAT BUTTON */}
-          <button 
-            onClick={handleGlobalChat}
-            className="w-full p-4 rounded-2xl bg-gradient-to-r from-purple-600 to-indigo-700 text-white font-bold flex items-center gap-3 shadow-lg hover:shadow-purple-200 transition-all"
-          >
-            <MessageSquare size={20}/> Global Chat
-          </button>
-
-          <button 
-            onClick={handleDormitoryChat}
-            className="w-full p-4 rounded-2xl bg-gradient-to-r from-blue-600 to-blue-700 text-white font-bold flex items-center gap-3 shadow-lg hover:shadow-blue-200 transition-all"
-          >
-            <Building2 size={20}/> My Dormitory
-          </button>
+          <div className="relative">
+            <Bell size={20} className="text-gray-400" />
+            {conversations.reduce((acc, c) => acc + (c.unread_count || 0), 0) > 0 && (
+              <span className="absolute -top-1 -right-1 bg-red-500 w-2.5 h-2.5 rounded-full border-2 border-white"></span>
+            )}
+          </div>
         </div>
 
-        <div className="flex-1 overflow-y-auto p-3 pt-0">
+        {/* КНОПКИ КАНАЛІВ */}
+        <div className="p-3 grid grid-cols-2 gap-2 border-b bg-gray-50">
+          <button
+            onClick={() => goToSpecialChat('global')}
+            className="relative flex flex-col items-center p-3 bg-white border rounded-2xl hover:border-blue-500 transition-all"
+          >
+            <Globe size={20} className="text-blue-500 mb-1" />
+            <span className="text-[10px] font-black uppercase">Global</span>
+
+            {conversations.find(c => c.type === 'global')?.unread_count > 0 && (
+              <span className="absolute top-1 right-2 bg-red-500 text-white text-[9px] px-1.5 rounded-full font-bold">
+                {conversations.find(c => c.type === 'global')?.unread_count}
+              </span>
+            )}
+          </button>
+
+          <button
+            onClick={() => goToSpecialChat('dormitory')}
+            className="relative flex flex-col items-center p-3 bg-white border rounded-2xl hover:border-blue-500 transition-all"
+          >
+            <Building2 size={20} className="text-blue-500 mb-1" />
+            <span className="text-[10px] font-black uppercase">My Dorm</span>
+
+            {conversations.find(c => c.type === 'dormitory')?.unread_count > 0 && (
+              <span className="absolute top-1 right-2 bg-red-500 text-white text-[9px] px-1.5 rounded-full font-bold">
+                {conversations.find(c => c.type === 'dormitory')?.unread_count}
+              </span>
+            )}
+          </button>
+        </div>
+
+        <div className="flex-1 overflow-y-auto p-3">
+          <p className="text-[10px] font-black uppercase text-gray-400 mb-3 px-2">Messages</p>
+
           {loading ? (
-            <div className="flex justify-center p-10"><Loader2 className="animate-spin text-blue-500" /></div>
+            <div className="flex justify-center p-5">
+              <Loader2 className="animate-spin text-blue-500" />
+            </div>
           ) : (
             conversations.map((conv) => (
-              <div key={conv.id} className="relative group mb-2">
-                <button 
+              <div key={conv.id} className="group mb-1">
+                <button
                   onClick={() => navigate(`/chat/${conv.id}`)}
-                  className={`w-full p-4 rounded-2xl text-left border transition-all flex flex-col ${
-                    chatId === String(conv.id) 
-                      ? 'bg-blue-600 text-white border-blue-600 shadow-md' 
-                      : 'bg-white text-gray-900 border-gray-100 hover:bg-gray-50'
+                  className={`w-full p-4 rounded-2xl text-left flex justify-between items-center transition-all ${
+                    chatId === String(conv.id)
+                      ? 'bg-blue-600 text-white shadow-lg shadow-blue-200'
+                      : 'hover:bg-gray-50'
                   }`}
                 >
-                  <span className="font-bold truncate text-sm pr-6">
-                    {conv.type === 'group' 
-                      ? `Dormitory №${conv.dormitory_number}` 
-                      : (conv.display_name || conv.product_title || 'Direct Message')}
-                  </span>
-                  <span className={`text-[10px] uppercase font-black opacity-50 ${chatId === String(conv.id) ? 'text-white' : 'text-blue-600'}`}>
-                    {conv.type}
-                  </span>
-                </button>
-                
-                <button 
-                  onClick={(e) => { e.stopPropagation(); handleDeleteChat(conv.id); }}
-                  className={`absolute right-3 top-1/2 -translate-y-1/2 p-2 rounded-xl transition-all opacity-0 group-hover:opacity-100 ${
-                    chatId === String(conv.id) ? 'text-white hover:bg-blue-500' : 'text-red-400 hover:bg-red-50 hover:text-red-600'
-                  }`}
-                >
-                  <Trash2 size={16}/>
+                  <div className="truncate">
+                    <p className="font-bold text-sm truncate">{conv.display_name || `Chat #${conv.id}`}</p>
+                    <p className="text-[9px] uppercase font-black opacity-60">{conv.type}</p>
+                  </div>
+
+                  <div className="flex items-center gap-2">
+                    {/* ✅ КНОПКА ВИДАЛЕННЯ */}
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleDeleteChat(conv.id);
+                      }}
+                      className={`opacity-0 group-hover:opacity-100 transition-all p-2 rounded-xl hover:bg-red-50 ${
+                        chatId === String(conv.id) ? "text-white hover:bg-red-500/20" : "text-red-500"
+                      }`}
+                    >
+                      <Trash2 size={16} />
+                    </button>
+
+                    {/* КАУНТ ДЛЯ ПРИВАТНИХ ЧАТІВ */}
+                    {conv.unread_count > 0 && chatId !== String(conv.id) && (
+                      <span className="bg-red-500 text-white text-[10px] font-bold h-5 w-5 flex items-center justify-center rounded-full">
+                        {conv.unread_count}
+                      </span>
+                    )}
+                  </div>
                 </button>
               </div>
             ))
@@ -207,48 +218,37 @@ export function Chat() {
         </div>
       </aside>
 
-      {/* MAIN CONTENT */}
-      <main className={`flex-1 flex flex-col bg-[#fcfdfe] ${!chatId ? 'hidden lg:flex' : 'flex'}`}>
+      <main className={`flex-1 flex flex-col bg-white ${!chatId ? 'hidden lg:flex' : 'flex'}`}>
         {chatId && currentChat ? (
           <>
-            <div className="bg-white border-b p-4 flex items-center justify-between shadow-sm z-10">
-              <div className="flex items-center gap-3">
-                <button onClick={() => navigate('/chat')} className="lg:hidden p-2 text-gray-500 hover:bg-gray-100 rounded-full transition-colors">
-                  <ArrowLeft size={20}/>
-                </button>
-                <div className="w-10 h-10 bg-blue-600 rounded-xl flex items-center justify-center text-white font-black text-lg">
-                  {/* SAFE INITIALS */}
-                  {(currentChat?.display_name?.[0] || currentChat?.product_title?.[0] || 'C').toUpperCase()}
-                </div>
-                <div>
-                  <h2 className="font-black uppercase text-xs tracking-widest text-gray-900 leading-none mb-1">
-                    {currentChat?.display_name || currentChat?.product_title || 'Private Chat'}
-                  </h2>
-                  <p className="text-[10px] text-green-500 font-bold uppercase">Online</p>
-                </div>
-              </div>
-              
-              <button 
-                onClick={() => handleDeleteChat(chatId)}
-                className="p-2 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-xl transition-all"
-              >
-                <Trash2 size={20}/>
+            <header className="border-b p-4 flex items-center gap-3 bg-white">
+              <button onClick={() => navigate('/chat')} className="lg:hidden">
+                <ArrowLeft size={20} />
               </button>
-            </div>
+              <div className="w-8 h-8 bg-blue-600 rounded-lg flex items-center justify-center text-white text-xs font-black">
+                {currentChat.display_name?.[0]}
+              </div>
+              <h2 className="font-black uppercase text-xs tracking-widest">{currentChat.display_name}</h2>
+            </header>
 
-            <div className="flex-1 overflow-y-auto p-4 space-y-4">
+            <div className="flex-1 overflow-y-auto p-4 space-y-4 bg-gray-50/30">
               {currentChat.messages?.map((msg: any) => {
                 const isMe = String(msg.sender) === String(currentUserId);
                 return (
                   <div key={msg.id} className={`flex ${isMe ? 'justify-end' : 'justify-start'}`}>
-                    <div className={`max-w-[75%] px-4 py-3 rounded-2xl shadow-sm ${
-                      isMe 
-                        ? 'bg-blue-600 text-white rounded-tr-none' 
-                        : 'bg-white border border-gray-100 text-gray-800 rounded-tl-none'
-                    }`}>
-                      {!isMe && <p className="text-[9px] font-black uppercase text-blue-500 mb-1">{msg.sender_name}</p>}
-                      <p className="text-sm leading-relaxed">{msg.text}</p>
-                      <p className={`text-[9px] text-right mt-1 font-bold opacity-40`}>{msg.timestamp}</p>
+                    <div
+                      className={`max-w-[75%] p-3 rounded-2xl shadow-sm ${
+                        isMe
+                          ? 'bg-blue-600 text-white rounded-tr-none'
+                          : 'bg-white border rounded-tl-none'
+                      }`}
+                    >
+                      {!isMe && (
+                        <p className="text-[9px] font-black text-blue-500 uppercase mb-1">
+                          {msg.sender_name}
+                        </p>
+                      )}
+                      <p className="text-sm">{msg.text}</p>
                     </div>
                   </div>
                 );
@@ -256,29 +256,28 @@ export function Chat() {
               <div ref={messagesEndRef} />
             </div>
 
-            <div className="p-4 bg-white border-t">
-              <form onSubmit={handleSendMessage} className="max-w-4xl mx-auto flex gap-2">
-                <input 
-                  type="text" 
-                  value={newMessage} 
+            <footer className="p-4 bg-white border-t">
+              <form onSubmit={handleSendMessage} className="flex gap-2">
+                <input
+                  type="text"
+                  value={newMessage}
                   onChange={(e) => setNewMessage(e.target.value)}
-                  className="flex-1 p-4 bg-gray-50 border-none rounded-2xl outline-none text-sm focus:ring-2 focus:ring-blue-500/10 focus:bg-white transition-all"
-                  placeholder="Type a message..."
+                  className="flex-1 p-3 bg-gray-100 rounded-xl outline-none text-sm"
+                  placeholder="Напишіть щось..."
                 />
-                <button 
-                  type="submit" 
+                <button
+                  type="submit"
                   disabled={!newMessage.trim()}
-                  className="p-4 bg-blue-600 text-white rounded-2xl shadow-lg hover:bg-blue-700 disabled:opacity-50 disabled:shadow-none transition-all"
+                  className="p-3 bg-blue-600 text-white rounded-xl disabled:opacity-50"
                 >
-                  <Send size={20}/>
+                  <Send size={20} />
                 </button>
               </form>
-            </div>
+            </footer>
           </>
         ) : (
-          <div className="flex-1 flex flex-col items-center justify-center text-gray-300">
-            <MessageSquare size={80} className="mb-4 opacity-10" />
-            <p className="font-black text-xl italic uppercase tracking-widest opacity-20">Select a conversation</p>
+          <div className="flex-1 flex items-center justify-center text-gray-300 font-black uppercase italic tracking-widest">
+            Виберіть чат
           </div>
         )}
       </main>

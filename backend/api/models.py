@@ -116,6 +116,14 @@ class Conversation(models.Model):
         # Для приватних чатів виводимо список учасників
         usernames = ", ".join([u.username for u in self.participants.all()[:2]])
         return f"Private: {usernames}"
+    def get_unread_count(self, user):
+        """
+        Рахує повідомлення, де:
+        1. Повідомлення належить цій бесіді.
+        2. Статус is_read = False.
+        3. Відправник — НЕ цей користувач.
+        """
+        return self.messages.filter(is_read=False).exclude(sender=user).count()
 class Message(models.Model):
     conversation = models.ForeignKey(Conversation, on_delete=models.CASCADE, related_name='messages')
     sender = models.ForeignKey(User, on_delete=models.CASCADE)

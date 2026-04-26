@@ -1,7 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router';
 import { Bell, MessageCircle, Gift, Calendar, Check, Filter } from 'lucide-react';
-import { api } from '../utils/supabaseClient';
 import { toast } from 'sonner';
 
 interface Notification {
