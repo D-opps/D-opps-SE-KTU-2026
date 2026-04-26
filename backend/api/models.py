@@ -30,6 +30,7 @@ class Product(models.Model):
     seller = models.ForeignKey(User, on_delete=models.CASCADE, related_name='products')
     status = models.CharField(max_length=20, default='available')
     created_at = models.DateTimeField(auto_now_add=True)
+    is_used = models.BooleanField(default=False)
 
 class Machine(models.Model):
     TYPE_CHOICES = (('washer', 'Washer'), ('dryer', 'Dryer'))

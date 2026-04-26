@@ -21,7 +21,27 @@ from rest_framework import generics
 from rest_framework.parsers import MultiPartParser, FormParser
 
 User = get_user_model()
-# views.py
+from rest_framework.decorators import api_view, permission_classes
+
+
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def search_user_by_email(request):
+    email = request.query_params.get('email')
+
+    if not email:
+        return Response({"error": "email required"}, status=400)
+
+    user = User.objects.filter(email=email).first()
+
+    if not user:
+        return Response({"error": "not found"}, status=404)
+
+    return Response({
+        "id": user.id,
+        "username": user.username,
+        "email": user.email,
+    })# views.py
 @api_view(['GET'])
 def get_me(request):
     serializer = UserSerializer(request.user)
@@ -176,6 +196,7 @@ class ConversationViewSet(viewsets.ModelViewSet):
 
     def get_queryset(self):
         return Conversation.objects.filter(participants=self.request.user).distinct()
+
 
     def create(self, request, *args, **kwargs):
         product_id = request.data.get('product_id')
