@@ -1,4 +1,4 @@
-name: DormLife Backend Check
+name: DormLife Backend CI
 
 on:
   push:
@@ -9,11 +9,15 @@ on:
 jobs:
   test-backend:
     runs-on: ubuntu-latest
+    
+    # Вказуємо, що команди мають виконуватися всередині папки backend
     defaults:
       run:
-        working-directory: ./backend # Твій шлях до бекенду
+        working-directory: ./backend
+
     steps:
-      - uses: actions/checkout@v4
+      - name: Checkout code
+        uses: actions/checkout@v4
 
       - name: Set up Python
         uses: actions/setup-python@v4
@@ -25,9 +29,10 @@ jobs:
           python -m pip install --upgrade pip
           pip install django djangorestframework djangorestframework-simplejwt django-cors-headers django-rest-passwordreset pillow requests
 
-      - name: Run Tests
+      - name: Run Django Tests
         env:
-          # Передаємо секрети у віртуальну машину
+          # Передаємо секрети, які ти додала в Settings -> Secrets
           SECRET_KEY: ${{ secrets.DJANGO_SECRET_KEY }}
           EMAIL_HOST_PASSWORD: ${{ secrets.EMAIL_PASSWORD }}
-        run: python manage.py test
+        run: |
+          python manage.py test
