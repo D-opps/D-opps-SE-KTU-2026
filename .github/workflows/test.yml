@@ -1,0 +1,7 @@
+name: Check Connection
+on: [push]
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - run: echo "I am alive and I don't need secrets yet!"
