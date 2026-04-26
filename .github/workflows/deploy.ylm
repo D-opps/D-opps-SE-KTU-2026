@@ -1,0 +1,61 @@
+name: DormLife CI/CD Pipeline
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  # 1. Тестування Бекенду
+  backend-testing:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: ./backend # Вказуємо шлях до папки бекенду
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.13' # Твоя версія Python
+
+      - name: Install Dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install django djangorestframework djangorestframework-simplejwt django-cors-headers django-rest-passwordreset pillow requests
+
+      - name: Run Django Tests
+        run: python manage.py test
+
+  # 2. Збірка Фронтенду
+  frontend-build:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: ./frontend # Вказуємо шлях до папки фронтенду
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 18
+
+      - name: Install Dependencies
+        run: npm install
+
+      - name: Build React App
+        run: npm run build
+
+  # 3. Деплой (Наприклад, на Vercel для фронта)
+  deploy-staging:
+    needs: [backend-testing, frontend-build] # Деплой почнеться тільки якщо тести пройшли
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        
+      - name: Notify
+        run: echo "All tests passed! Ready to deploy to staging."
