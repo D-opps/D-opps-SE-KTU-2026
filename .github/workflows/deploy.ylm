@@ -2,7 +2,7 @@ name: DormLife CI/CD Pipeline
 
 on:
   push:
-    branches: [ main ]
+    branches: [ main, DOSC2-177 ]
   pull_request:
     branches: [ main ]
 
