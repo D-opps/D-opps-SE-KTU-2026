@@ -39,6 +39,7 @@ urlpatterns = [
         # ВИПРАВЛЕНО: Прибираємо "views." з назви, якщо функція імпортована напряму, 
         # АБО використовуємо views.get_me, якщо імпортували 'from api import views'
         path('users/me/', views.get_me),
+        path('users/search/', views.search_user_by_email),
     ])),
     
     path('api-auth/', include('rest_framework.urls')),
