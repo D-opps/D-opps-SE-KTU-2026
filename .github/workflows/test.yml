@@ -1,7 +1,33 @@
-name: Check Connection
-on: [push]
+name: DormLife Backend Check
+
+on:
+  push:
+    branches: [ "main", "DOSK2-177" ]
+  pull_request:
+    branches: [ "main" ]
+
 jobs:
-  test:
+  test-backend:
     runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: ./backend # Твій шлях до бекенду
     steps:
-      - run: echo "I am alive and I don't need secrets yet!"
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.13'
+
+      - name: Install Dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install django djangorestframework djangorestframework-simplejwt django-cors-headers django-rest-passwordreset pillow requests
+
+      - name: Run Tests
+        env:
+          # Передаємо секрети у віртуальну машину
+          SECRET_KEY: ${{ secrets.DJANGO_SECRET_KEY }}
+          EMAIL_HOST_PASSWORD: ${{ secrets.EMAIL_PASSWORD }}
+        run: python manage.py test
