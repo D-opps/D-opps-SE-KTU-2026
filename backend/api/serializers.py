@@ -62,13 +62,34 @@ class ConversationSerializer(serializers.ModelSerializer):
     #participants = UserSerializer(many=True, read_only=True)
     #receiver_id = serializers.CharField(required=False, allow_null=True)
 
+    unread_count = serializers.SerializerMethodField()
+    display_name = serializers.SerializerMethodField()
     product_id = serializers.IntegerField(required=False, allow_null=True, write_only=True)
     username = serializers.CharField(required=False, allow_null=True, write_only=True)
     receiver_id = serializers.CharField(required=False, allow_null=True, write_only=True)
     participants = UserSerializer(many=True, read_only=True)
     class Meta:
         model = Conversation
-        fields = ['id', 'type', 'participants', 'product', 'product_title', 'dormitory_number', 'messages', 'created_at', 'product_id', 'receiver_id', 'username']
+        fields = ['id', 'type', 'participants', 'product', 'product_title', 'dormitory_number', 'messages', 'created_at', 'product_id', 'receiver_id', 'username', 'unread_count', 'display_name']
+    def get_unread_count(self, obj):
+        user = self.context.get('request').user
+        if user.is_authenticated:
+            # Використовуємо метод, який ми раніше додали в модель Conversation
+            return obj.get_unread_count(user)
+        return 0
+
+    # Логіка визначення імені чату (хто співрозмовник)
+    def get_display_name(self, obj):
+        user = self.context.get('request').user
+        if obj.type == 'group':
+            return f"Dormitory №{obj.dormitory_number}"
+        
+        # Знаходимо першого учасника, який не є поточним юзером
+        other_participant = obj.participants.exclude(id=user.id).first()
+        if other_participant:
+            return other_participant.first_name or other_participant.username
+        return "Direct Message"
+    
     def create(self, validated_data):
         # 1. Видаляємо допоміжні поля з validated_data, щоб вони не потрапили в Conversation.objects.create()
         username = validated_data.pop('username', None)

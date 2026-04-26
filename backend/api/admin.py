@@ -25,3 +25,26 @@ class MachineAdmin(admin.ModelAdmin):
     # Убираем 'dormitory', оставляем только то, что точно есть в базе (id и status)
     list_display = ('id', 'status') 
     list_filter = ('status',)
+
+# backend/api/admin.py
+# backend/api/admin.py
+from .models import Conversation, Message
+
+@admin.register(Conversation)
+class ConversationAdmin(admin.ModelAdmin):
+    # Залишаємо тільки базові поля. 
+    # Якщо 'dormitory_number' теж видасть помилку — видали і його з списку.
+    list_display = ('id', 'type', 'dormitory_number', 'get_participants') 
+    list_editable = ('type', 'dormitory_number')
+    list_filter = ('type',)
+    def get_participants(self, obj):
+        # Покаже список юзернеймів через кому
+        return ", ".join([user.username for user in obj.participants.all()])
+    
+    get_participants.short_description = 'Учасники'
+
+@admin.register(Message)
+class MessageAdmin(admin.ModelAdmin):
+    # В моделі Message поле часу часто називається 'created_at' або 'date_posted'.
+    # Поки що залишимо тільки ID, відправника та чат.
+    list_display = ('id', 'sender', 'conversation')

@@ -1,62 +1,60 @@
 import { useState, useEffect } from 'react';
 import { useNavigate, useSearchParams, Link } from 'react-router';
 import { Mail, CheckCircle, XCircle, Loader2, ArrowRight } from 'lucide-react';
-import { api } from '../utils/supabaseClient';
+import axios from 'axios';
+import { toast } from 'sonner';
 
 export function VerifyEmail() {
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
   const [status, setStatus] = useState<'loading' | 'success' | 'error'>('loading');
   const [message, setMessage] = useState('');
-  const [email, setEmail] = useState('');
   const [resending, setResending] = useState(false);
 
+  // Отримуємо токен з URL (наприклад: /verify-email?token=...&email=...)
   const token = searchParams.get('token');
   const emailParam = searchParams.get('email');
+  
+  const BASE_URL = 'http://172.20.10.3:8000'; // Твій новий IP
 
   useEffect(() => {
     if (token) {
       verifyEmail();
     } else {
       setStatus('error');
-      setMessage('Invalid verification link');
+      setMessage('Invalid verification link (token missing)');
     }
   }, [token]);
 
   const verifyEmail = async () => {
     try {
-      const result = await api.verifyEmail(token!);
-      if (result.success) {
-        setStatus('success');
-        setMessage(result.message || 'Email verified successfully!');
-      } else {
-        setStatus('error');
-        setMessage(result.error || 'Verification failed');
-        if (emailParam) {
-          setEmail(emailParam);
-        }
-      }
-    } catch (error) {
+      // Відправляємо токен на твій Django бекенд
+      const res = await axios.get(`${BASE_URL}/api/verify-email/`, {
+        params: { token: token }
+      });
+
+      setStatus('success');
+      setMessage(res.data.message || 'Email verified successfully!');
+      toast.success("Account activated!");
+    } catch (error: any) {
       console.error('Verification error:', error);
       setStatus('error');
-      setMessage('An error occurred during verification');
+      setMessage(error.response?.data?.error || 'Verification failed or link expired');
     }
   };
 
   const handleResendVerification = async () => {
-    if (!email) return;
+    if (!emailParam) return;
 
     setResending(true);
     try {
-      const result = await api.resendVerification(email);
-      if (result.success) {
-        setMessage('Verification email sent! Please check your inbox.');
-      } else {
-        setMessage(result.error || 'Failed to resend verification email');
-      }
-    } catch (error) {
-      console.error('Resend error:', error);
-      setMessage('Failed to resend verification email');
+      await axios.post(`${BASE_URL}/api/resend-verification/`, {
+        email: emailParam
+      });
+      toast.success("Verification email sent!");
+      setMessage('A new verification email has been sent to your inbox.');
+    } catch (error: any) {
+      toast.error(error.response?.data?.error || "Failed to resend");
     } finally {
       setResending(false);
     }
@@ -66,69 +64,62 @@ export function VerifyEmail() {
     <div className="min-h-screen bg-gradient-to-br from-blue-50 to-blue-100 flex items-center justify-center p-4">
       <div className="w-full max-w-md">
         <div className="text-center mb-8">
-          <h1 className="text-4xl mb-2 text-blue-600">DormLife</h1>
-          <p className="text-gray-600">Email Verification</p>
+          <h1 className="text-4xl font-black italic uppercase tracking-tighter text-blue-600">DormLife</h1>
+          <p className="text-gray-600 font-bold uppercase text-xs tracking-widest mt-2">Email Verification</p>
         </div>
 
-        <div className="bg-white rounded-2xl shadow-lg p-6 sm:p-8 text-center">
+        <div className="bg-white rounded-3xl shadow-xl p-8 text-center border border-white">
           {status === 'loading' && (
-            <>
+            <div className="py-10">
               <Loader2 className="w-16 h-16 text-blue-600 mx-auto mb-4 animate-spin" />
-              <h2 className="text-2xl font-bold text-gray-900 mb-2">Verifying...</h2>
-              <p className="text-gray-600">Please wait while we verify your email address.</p>
-            </>
+              <h2 className="text-2xl font-black text-gray-900 mb-2 uppercase">Verifying...</h2>
+              <p className="text-gray-500">Please wait while we check your credentials.</p>
+            </div>
           )}
 
           {status === 'success' && (
-            <>
-              <CheckCircle className="w-16 h-16 text-green-600 mx-auto mb-4" />
-              <h2 className="text-2xl font-bold text-gray-900 mb-2">Success!</h2>
-              <p className="text-gray-600 mb-6">{message}</p>
+            <div className="py-6">
+              <div className="w-20 h-20 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-6">
+                <CheckCircle className="w-12 h-12 text-green-600" />
+              </div>
+              <h2 className="text-3xl font-black text-gray-900 mb-2 uppercase">Success!</h2>
+              <p className="text-gray-600 mb-8">{message}</p>
               <Link
                 to="/login"
-                className="inline-flex items-center gap-2 bg-blue-600 text-white px-6 py-3 rounded-lg hover:bg-blue-700 transition-colors"
+                className="w-full inline-flex items-center justify-center gap-2 bg-blue-600 text-white font-black py-4 rounded-2xl hover:bg-blue-700 transition-all shadow-lg hover:shadow-blue-200"
               >
-                Sign In
+                SIGN IN
                 <ArrowRight className="w-5 h-5" />
               </Link>
-            </>
+            </div>
           )}
 
           {status === 'error' && (
-            <>
-              <XCircle className="w-16 h-16 text-red-600 mx-auto mb-4" />
-              <h2 className="text-2xl font-bold text-gray-900 mb-2">Verification Failed</h2>
-              <p className="text-gray-600 mb-6">{message}</p>
+            <div className="py-6">
+              <div className="w-20 h-20 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-6">
+                <XCircle className="w-12 h-12 text-red-600" />
+              </div>
+              <h2 className="text-3xl font-black text-gray-900 mb-2 uppercase">Failed</h2>
+              <p className="text-gray-600 mb-8">{message}</p>
 
-              {email && (
-                <div className="mb-4">
-                  <button
-                    onClick={handleResendVerification}
-                    disabled={resending}
-                    className="w-full bg-blue-600 text-white py-3 rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
-                  >
-                    {resending ? (
-                      <>
-                        <Loader2 className="w-5 h-5 animate-spin" />
-                        Sending...
-                      </>
-                    ) : (
-                      <>
-                        <Mail className="w-5 h-5" />
-                        Resend Verification Email
-                      </>
-                    )}
-                  </button>
-                </div>
+              {emailParam && (
+                <button
+                  onClick={handleResendVerification}
+                  disabled={resending}
+                  className="w-full bg-blue-600 text-white font-black py-4 rounded-2xl hover:bg-blue-700 transition-all shadow-lg flex items-center justify-center gap-2 mb-4"
+                >
+                  {resending ? <Loader2 className="w-5 h-5 animate-spin" /> : <Mail className="w-5 h-5" />}
+                  RESEND EMAIL
+                </button>
               )}
 
               <Link
                 to="/login"
-                className="text-sm text-blue-600 hover:underline"
+                className="text-xs font-black text-blue-600 hover:underline uppercase tracking-widest"
               >
                 Back to Login
               </Link>
-            </>
+            </div>
           )}
         </div>
       </div>

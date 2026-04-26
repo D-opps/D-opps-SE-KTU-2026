@@ -178,62 +178,93 @@ class ConversationViewSet(viewsets.ModelViewSet):
         return Conversation.objects.filter(participants=self.request.user).distinct()
 
     def create(self, request, *args, **kwargs):
-            product_id = request.data.get('product_id')
-            username = request.data.get('username')
-            
-            # --- СЦЕНАРІЙ 1: ЧАТ ПО ТОВАРУ (Маркетплейс) ---
-            if product_id:
-                try:
-                    product = Product.objects.get(id=product_id)
-                    opponent = product.seller # Юзер — це продавець товару
-                    
-                    if opponent == request.user:
-                        return Response({"error": "You cannot start a conversation with yourself"}, status=400)
+        product_id = request.data.get('product_id')
+        username = request.data.get('username')
+        chat_type = request.data.get('type')  # Отримуємо тип 'global' або 'dormitory'
 
-                    # Шукаємо існуючий чат по цьому продукту
-                    conversation = Conversation.objects.filter(
-                        product=product,
-                        participants=request.user
-                    ).filter(participants=opponent).first()
+        # --- СЦЕНАРІЙ 0: СПЕЦІАЛЬНІ ЧАТИ (Global/Dorm) ---
+        if chat_type in ['global', 'dormitory']:
 
-                    if not conversation:
-                        conversation = Conversation.objects.create(product=product, type='private')
-                        conversation.participants.add(request.user, opponent)
+            if chat_type == 'dormitory':
+                dorm_num = request.user.dormitory
 
-                    serializer = self.get_serializer(conversation)
-                    return Response(serializer.data, status=201)
-                
-                except Product.DoesNotExist:
-                    return Response({"error": "Product not found"}, status=404)
-
-            # --- СЦЕНАРІЙ 2: ПРИВАТНИЙ ЧАТ (Пошук за іменем) ---
-            elif username:
-                opponent = User.objects.filter(
-                    Q(username__iexact=username) | Q(email__iexact=username)
+                conversation = Conversation.objects.filter(
+                    type='group',
+                    dormitory_number=dorm_num
                 ).first()
 
-                if not opponent:
-                    # Ось тут вилітає твоя помилка. Перевір, чи є юзер з таким ім'ям в БД!
-                    return Response({"error": "User not found"}, status=404)
-                
-                if opponent == request.user:
-                    return Response({"error": "You cannot chat with yourself"}, status=400)
+                print("USER:", request.user.username)
+                print("DORM:", dorm_num)
 
-                # Шукаємо чат без продукту
+                if not conversation:
+                    conversation = Conversation.objects.create(
+                        type='group',
+                        dormitory_number=dorm_num
+                    )
+
+            else:
+                conversation = Conversation.objects.filter(type='global_chat').first()
+
+                if not conversation:
+                    conversation = Conversation.objects.create(
+                        type='global_chat'
+                    )
+
+            # Додаємо юзера в учасники, якщо його там ще немає
+            if request.user not in conversation.participants.all():
+                conversation.participants.add(request.user)
+
+            serializer = self.get_serializer(conversation)
+            return Response(serializer.data, status=200)
+
+        # --- СЦЕНАРІЙ 1: ЧАТ ПО ТОВАРУ (Твій старий код) ---
+        if product_id:
+            try:
+                product = Product.objects.get(id=product_id)
+                opponent = product.seller
+                if opponent == request.user:
+                    return Response({"error": "You cannot start a conversation with yourself"}, status=400)
+
                 conversation = Conversation.objects.filter(
-                    product__isnull=True,
-                    type='private',
+                    product=product,
                     participants=request.user
                 ).filter(participants=opponent).first()
 
                 if not conversation:
-                    conversation = Conversation.objects.create(type='private')
+                    conversation = Conversation.objects.create(product=product, type='private')
                     conversation.participants.add(request.user, opponent)
 
                 serializer = self.get_serializer(conversation)
                 return Response(serializer.data, status=201)
+            except Product.DoesNotExist:
+                return Response({"error": "Product not found"}, status=404)
 
-            return Response({"error": "Send product_id or username"}, status=400)
+        # --- СЦЕНАРІЙ 2: ПРИВАТНИЙ ЧАТ (Твій старий код) ---
+        elif username:
+            opponent = User.objects.filter(
+                Q(username__iexact=username) | Q(email__iexact=username)
+            ).first()
+
+            if not opponent:
+                return Response({"error": "User not found"}, status=404)
+            
+            if opponent == request.user:
+                return Response({"error": "You cannot chat with yourself"}, status=400)
+
+            conversation = Conversation.objects.filter(
+                product__isnull=True,
+                type='private',
+                participants=request.user
+            ).filter(participants=opponent).first()
+
+            if not conversation:
+                conversation = Conversation.objects.create(type='private')
+                conversation.participants.add(request.user, opponent)
+
+            serializer = self.get_serializer(conversation)
+            return Response(serializer.data, status=201)
+
+        return Response({"error": "Send product_id, username or type"}, status=400)   
     @action(detail=False, methods=['get'])
     def dormitory_chat(self, request):
             user = request.user
@@ -319,6 +350,19 @@ class ConversationViewSet(viewsets.ModelViewSet):
             conv.participants.add(request.user)
             
         serializer = self.get_serializer(conv)
+        return Response(serializer.data)
+    def retrieve(self, request, *args, **kwargs):
+        # 1. Отримуємо об'єкт бесіди
+        instance = self.get_object()
+        
+        # 2. Оновлюємо статус повідомлень:
+        # Всі повідомлення в цьому чаті, які:
+        # - ще не прочитані (is_read=False)
+        # - відправлені НЕ поточним користувачем (exclude(sender=request.user))
+        instance.messages.filter(is_read=False).exclude(sender=request.user).update(is_read=True)
+        
+        # 3. Повертаємо дані як зазвичай
+        serializer = self.get_serializer(instance)
         return Response(serializer.data)
 
 class MessageViewSet(viewsets.ModelViewSet):
