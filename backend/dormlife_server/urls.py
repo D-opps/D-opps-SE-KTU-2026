@@ -8,7 +8,7 @@ from rest_framework.routers import DefaultRouter
 from api import views 
 from api.views import (
     GoogleLoginView, MachineViewSet, ProductViewSet, 
-    ProfileView, RegisterView, ConversationViewSet, MessageViewSet
+    ProfileView, RegisterView, ConversationViewSet, MessageViewSet, EventViewSet
 )
 from rest_framework_simplejwt.views import TokenObtainPairView, TokenRefreshView
 
@@ -17,6 +17,7 @@ router.register(r'machines', MachineViewSet, basename='machine')
 router.register(r'products', ProductViewSet, basename='product')
 router.register(r'conversations', ConversationViewSet, basename='conversation')
 router.register(r'messages', MessageViewSet, basename='message')
+router.register(r'events', EventViewSet, basename='events')
 
 urlpatterns = [
     path('admin/', admin.site.urls),

@@ -130,3 +130,35 @@ class ExchangeOfferSerializer(serializers.ModelSerializer):
     class Meta:
         model = ExchangeOffer
         fields = '__all__'
+
+from .models import Event
+
+class EventSerializer(serializers.ModelSerializer):
+    creatorName = serializers.CharField(source='creator.first_name', read_only=True)
+    attendees = serializers.SerializerMethodField()
+
+    class Meta:
+        model = Event
+        fields = [
+            'id',
+            'title',
+            'description',
+            'date',
+            'location',
+            'dormitory',
+            'creator',
+            'creatorName',
+            'attendees',
+            'created_at'
+        ]
+        read_only_fields = ['creator', 'dormitory']
+
+    def get_attendees(self, obj):
+        return [
+            {
+                "userId": u.id,
+                "name": u.first_name or u.username
+            }
+            for u in obj.attendees.all()
+        ]
+    

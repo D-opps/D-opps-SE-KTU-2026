@@ -1,3 +1,4 @@
+
 from rest_framework import viewsets, permissions, status, views
 from rest_framework.response import Response
 
@@ -6,10 +7,10 @@ from rest_framework.permissions import AllowAny, IsAuthenticated
 from django.contrib.auth import get_user_model
 from rest_framework_simplejwt.tokens import RefreshToken
 from django.db.models import Q
-from .models import Favorite, Machine, Product, Conversation, Message, ExchangeOffer
+from .models import Favorite, Machine, Product, Conversation, Message, ExchangeOffer, Event, User
 from .serializers import (
     UserSerializer, MachineSerializer, ProductSerializer, 
-    ConversationSerializer, MessageSerializer, ExchangeOfferSerializer
+    ConversationSerializer, MessageSerializer, ExchangeOfferSerializer, EventSerializer
 )
 from rest_framework.views import APIView
 import requests
@@ -476,3 +477,32 @@ class ProfileView(APIView):
         except Exception as e:
             print(f"PATCH ERROR: {e}")
             return Response({"error": str(e)}, status=500)
+class EventViewSet(viewsets.ModelViewSet):
+    serializer_class = EventSerializer
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get_queryset(self):
+        return Event.objects.all().order_by('-date')
+    def perform_create(self, serializer):
+        serializer.save(
+            creator=self.request.user,
+            dormitory=self.request.user.dormitory
+        )
+
+    @action(detail=True, methods=['post'])
+    def rsvp(self, request, pk=None):
+        event = self.get_object()
+        user = request.user
+
+        if user in event.attendees.all():
+            event.attendees.remove(user)
+            attending = False
+        else:
+            event.attendees.add(user)
+            attending = True
+
+        return Response({
+            "success": True,
+            "attending": attending,
+            "event": EventSerializer(event).data
+        })

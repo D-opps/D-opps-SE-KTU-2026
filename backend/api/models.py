@@ -154,3 +154,27 @@ class Favorite(models.Model):
 
     class Meta:
         unique_together = ('user', 'product')
+class Event(models.Model):
+    title = models.CharField(max_length=200)
+    description = models.TextField()
+    date = models.DateTimeField()
+    location = models.CharField(max_length=255)
+
+    dormitory = models.IntegerField()
+
+    creator = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name='created_events'
+    )
+
+    attendees = models.ManyToManyField(
+        settings.AUTH_USER_MODEL,
+        related_name='events_attending',
+        blank=True
+    )
+
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    def __str__(self):
+        return self.title

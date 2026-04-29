@@ -10,6 +10,8 @@ import { Marketplace } from "./pages/Marketplace";
 import { ItemDetails } from "./pages/ItemDetails";
 import { Chat } from "./pages/Chat";
 import { Profile } from "./pages/Profile";
+import App from "./App";
+import { Events } from "./pages/Events";
 
 export const router = createBrowserRouter([
   {
@@ -39,6 +41,8 @@ export const router = createBrowserRouter([
       { path: "chat", Component: Chat },           // Відкриє список чатів
       { path: "chat/:chatId", Component: Chat },    // Відкриє конкретний чат за ID
       { path: "profile", Component: Profile },
+      {path: "events", Component: Events},
+
     ],
   },
 ]);
