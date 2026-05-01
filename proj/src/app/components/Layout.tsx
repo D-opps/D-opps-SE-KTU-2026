@@ -1,6 +1,6 @@
-import { Outlet, Link, useLocation } from 'react-router';
+import { Outlet, Link, useLocation } from 'react-router-dom';
 import { Home, WashingMachine, ShoppingBag, MessageSquare, User, LogOut, Calendar, Bell } from 'lucide-react';
-import { useNavigate } from 'react-router';
+import { useNavigate } from 'react-router-dom';
 import { useState, useEffect } from 'react';
 
 // Ми видалили імпорт api з supabaseClient

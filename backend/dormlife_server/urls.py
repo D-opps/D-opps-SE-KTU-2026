@@ -7,7 +7,7 @@ from rest_framework.routers import DefaultRouter
 # Імпортуємо модуль views цілком, щоб працював views.get_me
 from api import views 
 from api.views import (
-    GoogleLoginView, MachineViewSet, ProductViewSet, 
+    GoogleLoginView, MachineViewSet, NotificationViewSet, ProductViewSet, 
     ProfileView, RegisterView, ConversationViewSet, MessageViewSet, EventViewSet
 )
 from rest_framework_simplejwt.views import TokenObtainPairView, TokenRefreshView
@@ -18,6 +18,7 @@ router.register(r'products', ProductViewSet, basename='product')
 router.register(r'conversations', ConversationViewSet, basename='conversation')
 router.register(r'messages', MessageViewSet, basename='message')
 router.register(r'events', EventViewSet, basename='events')
+router.register(r'notifications', NotificationViewSet, basename='notification')
 
 urlpatterns = [
     path('admin/', admin.site.urls),

@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { useNavigate, Link } from 'react-router'; // Виправлено імпорт
+import { useNavigate, Link } from 'react-router-dom'; 
 import { UserCircle, ArrowLeft, Check, X, Loader2 } from 'lucide-react';
 import axios from 'axios';
 import { toast } from 'sonner'; // Додаємо нормальні нотифікації

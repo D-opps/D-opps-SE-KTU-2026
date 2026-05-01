@@ -7,10 +7,10 @@ from rest_framework.permissions import AllowAny, IsAuthenticated
 from django.contrib.auth import get_user_model
 from rest_framework_simplejwt.tokens import RefreshToken
 from django.db.models import Q
-from .models import Favorite, Machine, Product, Conversation, Message, ExchangeOffer, Event, User
+from .models import Favorite, Machine, Product, Conversation, Message, ExchangeOffer, Event, User, Notification
 from .serializers import (
     UserSerializer, MachineSerializer, ProductSerializer, 
-    ConversationSerializer, MessageSerializer, ExchangeOfferSerializer, EventSerializer
+    ConversationSerializer, MessageSerializer, ExchangeOfferSerializer, EventSerializer, NotificationSerializer
 )
 from rest_framework.views import APIView
 import requests
@@ -506,3 +506,32 @@ class EventViewSet(viewsets.ModelViewSet):
             "attending": attending,
             "event": EventSerializer(event).data
         })
+
+class NotificationViewSet(viewsets.ModelViewSet):
+    serializer_class = NotificationSerializer
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get_queryset(self):
+        # Користувач бачить лише свої сповіщення, найновіші зверху
+        queryset = Notification.objects.filter(user=self.request.user).order_by('-created_at')
+        
+        # Можливість фільтрації за типом через URL: /api/notifications/?type=offer
+        n_type = self.request.query_params.get('type')
+        if n_type:
+            queryset = queryset.filter(notification_type=n_type)
+        return queryset
+
+    @action(detail=False, methods=['post'])
+    def mark_all_as_read(self, request):
+        """Метод для позначення всіх сповіщень прочитаними за один клік"""
+        Notification.objects.filter(user=request.user, is_read=False).update(is_read=True)
+        return Response({'status': 'all notifications marked as read'}, status=status.HTTP_200_OK)
+
+    def update(self, request, *args, **kwargs):
+        """Дозволяє оновити статус окремого сповіщення (наприклад, mark as read)"""
+        partial = kwargs.pop('partial', False)
+        instance = self.get_object()
+        serializer = self.get_serializer(instance, data=request.data, partial=partial)
+        serializer.is_valid(raise_exception=True)
+        self.perform_update(serializer)
+        return Response(serializer.data)

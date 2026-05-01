@@ -1,4 +1,4 @@
-import { createBrowserRouter } from "react-router";
+import { createBrowserRouter } from "react-router-dom";
 import { Login } from "./pages/Login";
 import { Register } from "./pages/Register";
 import { ForgotPassword } from "./pages/ForgotPassword";
@@ -10,8 +10,9 @@ import { Marketplace } from "./pages/Marketplace";
 import { ItemDetails } from "./pages/ItemDetails";
 import { Chat } from "./pages/Chat";
 import { Profile } from "./pages/Profile";
-import App from "./App";
+// import App from "./App";
 import { Events } from "./pages/Events";
+import { Notifications } from "./pages/Notifications";
 
 export const router = createBrowserRouter([
   {
@@ -42,6 +43,7 @@ export const router = createBrowserRouter([
       { path: "chat/:chatId", Component: Chat },    // Відкриє конкретний чат за ID
       { path: "profile", Component: Profile },
       {path: "events", Component: Events},
+      {path: "notifications", Component: Notifications},
 
     ],
   },

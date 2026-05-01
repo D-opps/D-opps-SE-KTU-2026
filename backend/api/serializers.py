@@ -1,5 +1,5 @@
 from rest_framework import serializers
-from .models import User, Machine, Product, ProductPhoto, Message, Conversation, ExchangeOffer, Favorite
+from .models import User, Machine, Product, ProductPhoto, Message, Conversation, ExchangeOffer, Favorite, Notification
 from django.contrib.auth import get_user_model
 
 User = get_user_model()
@@ -160,5 +160,16 @@ class EventSerializer(serializers.ModelSerializer):
                 "name": u.first_name or u.username
             }
             for u in obj.attendees.all()
+        ]
+
+
+class NotificationSerializer(serializers.ModelSerializer):
+    timestamp = serializers.DateTimeField(source='created_at', format="%d.%m %H:%M", read_only=True)
+
+    class Meta:
+        model = Notification
+        fields = [
+            'id', 'notification_type', 'title', 'description', 
+            'target_id', 'is_read', 'timestamp'
         ]
     

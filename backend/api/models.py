@@ -178,3 +178,28 @@ class Event(models.Model):
 
     def __str__(self):
         return self.title
+    
+class Notification(models.Model):
+    NOTIFICATION_TYPES = (
+        ('message', 'New Message'),
+        ('offer', 'Exchange Offer'),
+        ('event', 'Upcoming Event'),
+        ('system', 'System Update'),
+    )
+
+    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='notifications')
+    notification_type = models.CharField(max_length=20, choices=NOTIFICATION_TYPES)
+    title = models.CharField(max_length=255)
+    description = models.TextField()
+    
+    # Ссилка на об'єкт (наприклад, ID товару або чату)
+    target_id = models.CharField(max_length=255, null=True, blank=True)
+    
+    is_read = models.BooleanField(default=False)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ['-created_at']
+
+    def __str__(self):
+        return f"{self.notification_type} for {self.user.email}"

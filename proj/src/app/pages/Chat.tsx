@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
-import { useParams, useNavigate } from 'react-router';
+import { useParams, useNavigate } from 'react-router-dom';
 import {
   Send, ArrowLeft, Loader2,
   Globe, Building2, Trash2, Search, Bell

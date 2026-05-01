@@ -1,5 +1,5 @@
 from django.contrib import admin
-from .models import User, Product, Machine, ProductPhoto
+from .models import User, Product, Machine, ProductPhoto, Notification
 
 # 1. Регистрация Пользователей (чтобы видеть роли и общежития)
 @admin.register(User)
@@ -48,3 +48,10 @@ class MessageAdmin(admin.ModelAdmin):
     # В моделі Message поле часу часто називається 'created_at' або 'date_posted'.
     # Поки що залишимо тільки ID, відправника та чат.
     list_display = ('id', 'sender', 'conversation')
+
+@admin.register(Notification)
+class NotificationAdmin(admin.ModelAdmin):
+    # Використовуємо реальні імена полів: title та description
+    list_display = ('user', 'notification_type', 'title', 'is_read', 'created_at') 
+    list_filter = ('notification_type', 'is_read', 'created_at')
+    search_fields = ('title', 'description', 'user__email')

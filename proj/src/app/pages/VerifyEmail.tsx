@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { useNavigate, useSearchParams, Link } from 'react-router';
+import { useNavigate, useSearchParams, Link } from 'react-router-dom';
 import { Mail, CheckCircle, XCircle, Loader2, ArrowRight } from 'lucide-react';
 import axios from 'axios';
 import { toast } from 'sonner';

@@ -1,4 +1,4 @@
-import { Link } from 'react-router';
+import { Link } from 'react-router-dom';
 import { 
   WashingMachine, ShoppingBag, MessageSquare, Users, 
   MessageCircle, Calendar, MessageSquare as ChatIcon, TrendingUp, Loader2, Zap

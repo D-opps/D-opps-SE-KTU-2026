@@ -1,4 +1,4 @@
-import { useParams, Link, useNavigate } from 'react-router';
+import { useParams, Link, useNavigate } from 'react-router-dom';
 import { ArrowLeft, Tag as TagIcon, MessageCircle as ChatIcon, Loader2 as LoaderIcon, AlertCircle } from 'lucide-react';
 import { useState, useEffect } from 'react';
 import axios from 'axios';

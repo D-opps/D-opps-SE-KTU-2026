@@ -1,6 +1,6 @@
 import { Mail, MapPin, Package, X, Building2, Camera, Loader2, Trash2 } from 'lucide-react';
 import { useState, useEffect, useRef } from 'react';
-import { useNavigate } from 'react-router';
+import { useNavigate } from 'react-router-dom';
 import axios from 'axios';
 import { toast } from 'sonner';
 

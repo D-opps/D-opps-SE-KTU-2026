@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { useNavigate, Link } from 'react-router'; // Тільки react-router
+import { useNavigate, Link } from 'react-router-dom'; 
 import { Mail, Lock, Loader2 } from 'lucide-react';
 import { toast } from 'sonner';
 import axios from 'axios';
