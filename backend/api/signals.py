@@ -1,8 +1,10 @@
+from sched import Event
+
 from django.core.mail import send_mail
 from django.dispatch import receiver
 from django.urls import reverse
 from django_rest_passwordreset.signals import reset_password_token_created
-from .models import Message, Notification
+from .models import Message, Notification, User, ExchangeOffer, Event
 from django.db.models.signals import post_save
 
 @receiver(reset_password_token_created)
@@ -18,11 +20,6 @@ def password_reset_token_created(sender, instance, reset_password_token, *args, 
         "noreply@dormlife.com",
         [reset_password_token.user.email]
     )
-
-from django.db.models.signals import post_save
-from django.dispatch import receiver
-from django.core.mail import send_mail
-from .models import Message
 
 @receiver(post_save, sender=Message)
 def send_email_notification(sender, instance, created, **kwargs):
@@ -72,3 +69,34 @@ def create_notification_on_message(sender, instance, created, **kwargs):
                     target_id=str(instance.conversation.id),
                     is_read=False
                 )
+
+@receiver(post_save, sender=ExchangeOffer)
+def create_notification_on_offer(sender, instance, created, **kwargs):
+    if created:
+        Notification.objects.create(
+            user=instance.item.owner, # Отримувач — власник товару
+            notification_type='offer',
+            title="New Exchange Offer!",
+            description=f"User {instance.sender.username} wants to exchange items.",
+            target_id=str(instance.id)
+        )
+
+@receiver(post_save, sender=Event)
+def create_notification_on_event(sender, instance, created, **kwargs):
+    if created:
+        # Отримуємо всіх користувачів, крім того, хто створив івент
+        users = User.objects.exclude(id=instance.creator.id)
+        
+        notifications = []
+        for user in users:
+            notifications.append(
+                Notification(
+                    user=user,
+                    notification_type='event',
+                    title=f"New Event: {instance.title}", # ВИПРАВЛЕНО: instance.title замість instance.name
+                    description=f"We invite you to join {instance.title} on {instance.date.strftime('%d.%m')}.", 
+                    target_id=str(instance.id)
+                )
+            )
+        
+        Notification.objects.bulk_create(notifications)
