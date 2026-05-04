@@ -164,12 +164,12 @@ class EventSerializer(serializers.ModelSerializer):
 
 
 class NotificationSerializer(serializers.ModelSerializer):
-    timestamp = serializers.DateTimeField(source='created_at', format="%d.%m %H:%M", read_only=True)
+    created_at = serializers.DateTimeField(format="%d.%m %H:%M", read_only=True)
 
     class Meta:
         model = Notification
         fields = [
             'id', 'notification_type', 'title', 'description', 
-            'target_id', 'is_read', 'timestamp'
+            'target_id', 'is_read', 'created_at' # Тут має бути created_at
         ]
     

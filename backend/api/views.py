@@ -513,6 +513,7 @@ class NotificationViewSet(viewsets.ModelViewSet):
 
     def get_queryset(self):
         # Користувач бачить лише свої сповіщення, найновіші зверху
+        print(f"DEBUG: Поточний користувач -> {self.request.user}") # Додайте цей рядок
         queryset = Notification.objects.filter(user=self.request.user).order_by('-created_at')
         
         # Можливість фільтрації за типом через URL: /api/notifications/?type=offer

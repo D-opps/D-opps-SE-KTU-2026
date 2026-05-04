@@ -1,7 +1,14 @@
 import os
 from pathlib import Path
 from datetime import timedelta
+import sentry_sdk
 
+sentry_sdk.init(
+    dsn="https://879cd28133bb1f8f6cb546a25cd58ba8@o4511331609214976.ingest.de.sentry.io/4511331617734736",
+    # Add data like request headers and IP for users,
+    # see https://docs.sentry.io/platforms/python/data-management/data-collected/ for more info
+    send_default_pii=True,
+)
 BASE_DIR = Path(__file__).resolve().parent.parent
 
 SECRET_KEY = 'django-insecure-&&fzdx3i5ygq(s+yd(0w)24_3syzs!_1m15qv_9h9j@x-megl8'

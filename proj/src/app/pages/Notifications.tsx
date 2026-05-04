@@ -262,7 +262,7 @@ export function Notifications() {
   // Екземпляр axios (краще винести в окремий файл api.ts)
   const api = axios.create({
     baseURL: 'http://127.0.0.1:8000/api/',
-    headers: { Authorization: `Bearer ${localStorage.getItem('access')}` }
+    headers: { Authorization: `Bearer ${localStorage.getItem('accessToken')}` }
   });
 
   // useEffect(() => {
@@ -300,35 +300,53 @@ export function Notifications() {
 //   }
 // };
 
-const loadNotifications = async () => {
-  // 1. Починаємо завантаження
-  setLoading(true); 
+// const loadNotifications = async () => {
+//   // 1. Починаємо завантаження
+//   setLoading(true); 
   
-  try {
-    const token = localStorage.getItem('accessToken'); 
+//   try {
+//     const token = localStorage.getItem('accessToken'); 
 
-    if (!token) {
-      console.error("Токен не знайдено");
-      setLoading(false); // Зупиняємо лоадер, якщо токена немає
-      return;
-    }
+//     if (!token) {
+//       console.error("Токен не знайдено");
+//       setLoading(false); // Зупиняємо лоадер, якщо токена немає
+//       return;
+//     }
+
+//     const response = await axios.get('http://127.0.0.1:8000/api/notifications/', {
+//       headers: {
+//         Authorization: `Bearer ${token}`
+//       }
+//     });
+
+//     setNotifications(response.data);
+//   } catch (error) {
+//     console.error("Error loading notifications:", error);
+    
+//     if (axios.isAxiosError(error) && error.response?.status === 401) {
+//        console.warn("Сесія завершена.");
+//        // navigate('/login');
+//     }
+//   } finally {
+//     // 2. Цей блок виконується ЗАВЖДИ: і при успіху, і при помилці
+//     setLoading(false); 
+//   }
+// };
+
+const loadNotifications = async () => {
+  setLoading(true); 
+  try {
+    const token = localStorage.getItem('accessToken'); // Переконайтеся, що ключ правильний!
 
     const response = await axios.get('http://127.0.0.1:8000/api/notifications/', {
-      headers: {
-        Authorization: `Bearer ${token}`
-      }
+      headers: { Authorization: `Bearer ${token}` }
     });
 
+    console.log("ВІДПОВІДЬ СЕРВЕРА:", response.data); // <-- ДОДАЙТЕ ЦЕ
     setNotifications(response.data);
   } catch (error) {
-    console.error("Error loading notifications:", error);
-    
-    if (axios.isAxiosError(error) && error.response?.status === 401) {
-       console.warn("Сесія завершена.");
-       // navigate('/login');
-    }
+    console.error("Помилка:", error);
   } finally {
-    // 2. Цей блок виконується ЗАВЖДИ: і при успіху, і при помилці
     setLoading(false); 
   }
 };
