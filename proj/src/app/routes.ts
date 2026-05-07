@@ -13,6 +13,9 @@ import { Profile } from "./pages/Profile";
 // import App from "./App";
 import { Events } from "./pages/Events";
 import { Notifications } from "./pages/Notifications";
+import ReportPage from "./pages/Report";
+import ReportDashboard from "./pages/ReportDashboard";
+
 
 export const router = createBrowserRouter([
   {
@@ -44,7 +47,8 @@ export const router = createBrowserRouter([
       { path: "profile", Component: Profile },
       {path: "events", Component: Events},
       {path: "notifications", Component: Notifications},
-
+      {path: "report/:type/:id", Component: ReportPage },
+      {path: "admin/reports", Component: ReportDashboard},
     ],
   },
 ]);

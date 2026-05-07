@@ -30,7 +30,9 @@ class Product(models.Model):
     seller = models.ForeignKey(User, on_delete=models.CASCADE, related_name='products')
     status = models.CharField(max_length=20, default='available')
     created_at = models.DateTimeField(auto_now_add=True)
-    is_used = models.BooleanField(default=False)
+    is_used = models.BooleanField(default=False)    
+    # ДОДАЙ ЦЕ:
+    is_flagged = models.BooleanField(default=False)
 
 class Machine(models.Model):
     TYPE_CHOICES = (('washer', 'Washer'), ('dryer', 'Dryer'))
@@ -133,7 +135,7 @@ class Message(models.Model):
     
     # Міняємо created_at на timestamp для зручності фронтенду (або залиш як є)
     created_at = models.DateTimeField(auto_now_add=True)
-
+    is_flagged = models.BooleanField(default=False)
     class Meta:
         ordering = ['created_at'] # Важливо, щоб повідомлення йшли по порядку
 
@@ -203,3 +205,45 @@ class Notification(models.Model):
 
     def __str__(self):
         return f"{self.notification_type} for {self.user.email}"
+    
+from django.contrib.contenttypes.fields import GenericForeignKey
+from django.contrib.contenttypes.models import ContentType
+
+class Report(models.Model):
+    STATUS_CHOICES = (
+        ('pending', 'Pending'),
+        ('resolved', 'Resolved'),
+        ('dismissed', 'Dismissed'),
+    )
+    
+    REASON_CHOICES = (
+        ('spam', 'Spam/Advertising'),
+        ('inappropriate', 'Inappropriate content'),
+        ('fraud', 'Fraud/Scam'),
+        ('other', 'Other'),
+    )
+
+    reporter = models.ForeignKey(User, on_delete=models.CASCADE, related_name='reports_made')
+    
+    # Generic Foreign Key дозволяє посилатися на Product або Message
+    # Змініть це поле в моделі Report:
+    content_type = models.ForeignKey(ContentType, on_delete=models.CASCADE, null=True, blank=True)
+    object_id = models.PositiveIntegerField(null=True, blank=True) # Додайте null=True і сюди про всяк випадок
+    content_object = GenericForeignKey('content_type', 'object_id')
+    
+    reason = models.CharField(max_length=20, choices=REASON_CHOICES)
+    description = models.TextField(blank=True, null=True)
+    
+    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='pending')
+    
+    # Хто розглянув скаргу (Admin або Doorkeeper)
+    handled_by = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True, related_name='reports_handled')
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ['-created_at']
+
+    def __str__(self):
+        # Використовуємо тернарний оператор для перевірки на None
+        content_name = self.content_type.name if self.content_type else "Unknown Type"
+        return f"Report by {self.reporter.username} on {content_name}"

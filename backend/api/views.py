@@ -7,10 +7,10 @@ from rest_framework.permissions import AllowAny, IsAuthenticated
 from django.contrib.auth import get_user_model
 from rest_framework_simplejwt.tokens import RefreshToken
 from django.db.models import Q
-from .models import Favorite, Machine, Product, Conversation, Message, ExchangeOffer, Event, User, Notification
+from .models import Favorite, Machine, Product, Conversation, Message, ExchangeOffer, Event, User, Notification, Report
 from .serializers import (
     UserSerializer, MachineSerializer, ProductSerializer, 
-    ConversationSerializer, MessageSerializer, ExchangeOfferSerializer, EventSerializer, NotificationSerializer
+    ConversationSerializer, MessageSerializer, ExchangeOfferSerializer, EventSerializer, NotificationSerializer, ReportSerializer
 )
 from rest_framework.views import APIView
 import requests
@@ -536,3 +536,57 @@ class NotificationViewSet(viewsets.ModelViewSet):
         serializer.is_valid(raise_exception=True)
         self.perform_update(serializer)
         return Response(serializer.data)
+    
+from django.contrib.contenttypes.models import ContentType
+from rest_framework.views import APIView
+from rest_framework.response import Response
+from rest_framework.permissions import IsAuthenticated
+
+class IsAdminOrDoorkeeper(permissions.BasePermission):
+    def has_permission(self, request, view):
+        return request.user.is_authenticated and (request.user.role in ['admin', 'doorkeeper'])
+
+# 1. Створення скарги (для студента)
+from rest_framework import viewsets, permissions, status
+from rest_framework.decorators import action
+from rest_framework.response import Response
+from .models import Report
+from .serializers import ReportSerializer
+
+# 1. Створення скарги (тепер він точно існує)
+class CreateReportView(generics.CreateAPIView):
+    serializer_class = ReportSerializer
+    permission_classes = [permissions.IsAuthenticated]
+
+    def perform_create(self, serializer):
+        serializer.save(reporter=self.request.user)
+
+# 2. Універсальний в'юсет (об'єднали два дублікати в один)
+class ReportViewSet(viewsets.ModelViewSet):
+    queryset = Report.objects.all()
+    serializer_class = ReportSerializer
+    permission_classes = [permissions.IsAuthenticated]
+
+    # Це дозволяє робити POST на /api/reports/manage/3/perform_action/
+    @action(detail=True, methods=['post'])
+    def perform_action(self, request, pk=None):
+        report = self.get_object() 
+        action_type = request.data.get('action')
+
+        if action_type == 'dismiss':
+            report.status = 'dismissed'
+            message = "Скарга відхилена"
+        elif action_type == 'remove':
+            if report.content_object:
+                report.content_object.delete()
+            report.status = 'resolved'
+            message = "Контент видалено"
+        elif action_type == 'warn':
+            report.status = 'resolved'
+            message = "Користувача попереджено"
+        else:
+            return Response({"error": "Невідома дія"}, status=status.HTTP_400_BAD_REQUEST)
+
+        report.handled_by = request.user
+        report.save()
+        return Response({"message": message})

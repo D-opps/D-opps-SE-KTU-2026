@@ -1,9 +1,7 @@
 import { Outlet, Link, useLocation } from 'react-router-dom';
-import { Home, WashingMachine, ShoppingBag, MessageSquare, User, LogOut, Calendar, Bell } from 'lucide-react';
+import { Home, WashingMachine, ShoppingBag, MessageSquare, User, LogOut, Calendar, Bell, Flag } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { useState, useEffect } from 'react';
-
-// Ми видалили імпорт api з supabaseClient
 
 export function Layout() {
   const location = useLocation();
@@ -15,41 +13,9 @@ export function Layout() {
   useEffect(() => {
     const role = localStorage.getItem('userRole') || 'student';
     setUserRole(role);
-    
-    // Завантажуємо лічильники при вході
-    // loadUnreadCounts();
-    
-    // // Опитуємо сервер кожні 30 секунд (Polling)
-    // const interval = setInterval(loadUnreadCounts, 30000);
-    // return () => clearInterval(interval);
   }, []);
 
-  // Оновлена функція для роботи з Django
-  // const loadUnreadCounts = async () => {
-  //   try {
-  //     // 1. Отримуємо кількість непрочитаних повідомлень
-  //     const msgResponse = await fetch('http://127.0.0.1:8000/api/chat/unread-count/');
-  //     if (msgResponse.ok) {
-  //       const data = await msgResponse.json();
-  //       setUnreadCount(data.count || 0);
-  //     }
-
-  //     // 2. Отримуємо сповіщення
-  //     const notifResponse = await fetch('http://127.0.0.1:8000/api/notifications/');
-  //     if (notifResponse.ok) {
-  //       const notifications = await notifResponse.json();
-  //       // Рахуємо тільки ті, де read === false
-  //       const unread = notifications.filter((n: any) => !n.read).length;
-  //       setNotificationCount(unread);
-  //     }
-  //   } catch (error) {
-  //     // Не спамимо помилками в консоль кожні 30 сек, якщо сервер лежить
-  //     console.warn('Could not fetch badges from Django (backend might be offline)');
-  //   }
-  // };
-
   const handleLogout = () => {
-    // Очищаємо все
     localStorage.clear(); 
     navigate('/login');
   };
@@ -123,6 +89,23 @@ export function Layout() {
                 </li>
               );
             })}
+
+            {/* Доданий пункт "Скарги" тільки для адмінів */}
+            {userRole === 'admin' && (
+              <li>
+                <Link
+                  to="/admin/reports"
+                  className={`flex items-center gap-3 px-3 lg:px-4 py-3 rounded-lg transition-all ${
+                    isActive('/admin/reports')
+                      ? 'bg-blue-50 text-blue-600 shadow-sm'
+                      : 'text-gray-600 hover:bg-gray-50 hover:text-blue-500'
+                  }`}
+                >
+                  <Flag className="w-5 h-5 flex-shrink-0" />
+                  <span className="hidden lg:inline font-medium">Complaints</span>
+                </Link>
+              </li>
+            )}
           </ul>
         </nav>
 

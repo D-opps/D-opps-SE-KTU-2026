@@ -1,11 +1,11 @@
 import { useParams, Link, useNavigate } from 'react-router-dom';
-import { ArrowLeft, Tag as TagIcon, MessageCircle as ChatIcon, Loader2 as LoaderIcon, AlertCircle } from 'lucide-react';
+import { ArrowLeft, Tag as TagIcon, MessageCircle as ChatIcon, Loader2 as LoaderIcon, AlertCircle, Flag } from 'lucide-react';
 import { useState, useEffect } from 'react';
 import axios from 'axios';
 import { toast } from 'sonner';
 
 export function ItemDetails() {
-  const { itemId } = useParams();
+  const { itemId } = useParams(); // Отримуємо ID з URL (в твоїх роутах цеitemId)
   const navigate = useNavigate();
   const [item, setItem] = useState<any>(null);
   const [loading, setLoading] = useState(true);
@@ -43,56 +43,63 @@ export function ItemDetails() {
     fetchItem();
   }, [itemId]);
 
- // ItemDetails.tsx
-
-const startConversation = async (initialMessage?: string, isExchange: boolean = false) => {
-  const token = localStorage.getItem('accessToken');
-  
-  if (!token) {
-    toast.error("Будь ласка, увійдіть, щоб зв'язатися з продавцем");
-    navigate('/login');
-    return;
-  }
-
-  const sellerId = item.seller_id || item.seller;
-  if (currentUserId === sellerId) {
-    toast.error("Це ваше власне оголошення!");
-    return;
-  }
-
-  try {
-    // ВАЖЛИВО: назва поля має бути product_id, як просить помилка 400
-    const res = await axios.post(`${BASE_URL}/api/conversations/`, {
-      product_id: item.id,     // ОСЬ ТУТ БУЛА ПОМИЛКА
-      receiver_id: sellerId,   // Перевір, чи не просить сервер receiver (без _id)
-      type: 'private'
-    }, {
-      headers: { Authorization: `Bearer ${token}` }
-    });
-    
-    const chatId = res.data.id;
-
-    // ПЕРЕХІД: робимо navigate відразу після успішного POST запиту
-    navigate(`/chat/${chatId}`);
-
-    if (initialMessage) {
-      try {
-        await axios.post(`${BASE_URL}/api/messages/`, {
-          conversation: chatId, 
-          text: initialMessage
-        }, {
-          headers: { Authorization: `Bearer ${token}` }
-        });
-      } catch (msgErr) {
-        console.error("Повідомлення не надіслано, але чат створено");
-      }
+  // ФУНКЦІЯ СКАРГИ
+  const handleReport = () => {
+    const token = localStorage.getItem('accessToken');
+    if (!token) {
+      toast.error("Будь ласка, увійдіть, щоб подати скаргу");
+      navigate('/login');
+      return;
     }
-  } catch (err: any) {
-    console.error("Full error data:", err.response?.data);
-    // Виводимо конкретну причину помилки від сервера
-    toast.error(err.response?.data?.error || "Не вдалося почати чат");
-  }
-};
+    // Переходимо на нашу нову сторінку скарги
+    // itemId беремо з useParams вище
+    navigate(`/report/product/${itemId}`);
+  };
+
+  const startConversation = async (initialMessage?: string, isExchange: boolean = false) => {
+    const token = localStorage.getItem('accessToken');
+    
+    if (!token) {
+      toast.error("Будь ласка, увійдіть, щоб зв'язатися з продавцем");
+      navigate('/login');
+      return;
+    }
+
+    const sellerId = item.seller_id || item.seller;
+    if (currentUserId === sellerId) {
+      toast.error("Це ваше власне оголошення!");
+      return;
+    }
+
+    try {
+      const res = await axios.post(`${BASE_URL}/api/conversations/`, {
+        product_id: item.id,
+        receiver_id: sellerId,
+        type: 'private'
+      }, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      
+      const chatId = res.data.id;
+      navigate(`/chat/${chatId}`);
+
+      if (initialMessage) {
+        try {
+          await axios.post(`${BASE_URL}/api/messages/`, {
+            conversation: chatId, 
+            text: initialMessage
+          }, {
+            headers: { Authorization: `Bearer ${token}` }
+          });
+        } catch (msgErr) {
+          console.error("Повідомлення не надіслано, але чат створено");
+        }
+      }
+    } catch (err: any) {
+      console.error("Full error data:", err.response?.data);
+      toast.error(err.response?.data?.error || "Не вдалося почати чат");
+    }
+  };
 
   const handleContactSeller = () => {
     const message = `Hi! I'm interested in "${item.title}".`;
@@ -125,12 +132,26 @@ const startConversation = async (initialMessage?: string, isExchange: boolean = 
           <img 
             src={item.image?.startsWith('http') ? item.image : `${BASE_URL}${item.image}`} 
             className="w-full h-auto max-h-[600px] object-cover" 
+            alt={item.title}
           />
         </div>
 
         <div className="bg-white rounded-[2.5rem] p-8 shadow-sm border border-gray-100 flex flex-col justify-between">
           <div>
-            <h1 className="text-4xl font-bold text-gray-900 mb-2">{item.title}</h1>
+            <div className="flex justify-between items-start mb-2">
+              <h1 className="text-4xl font-bold text-gray-900">{item.title}</h1>
+              {/* Кнопка прапорця тепер викликає handleReport */}
+              {!isOwner && (
+                <button 
+                  onClick={handleReport}
+                  className="p-3 text-gray-400 hover:text-red-500 hover:bg-red-50 transition-all rounded-full border border-transparent hover:border-red-100"
+                  title="Поскаржитися"
+                >
+                  <Flag size={24} />
+                </button>
+              )}
+            </div>
+            
             <div className="text-3xl font-black text-blue-600 mb-6">${item.price}</div>
             <p className="text-gray-600 leading-relaxed whitespace-pre-line mb-8">{item.description}</p>
           </div>
@@ -152,10 +173,10 @@ const startConversation = async (initialMessage?: string, isExchange: boolean = 
               </div>
             ) : (
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <button onClick={handleContactSeller} className="flex items-center justify-center gap-2 px-6 py-4 bg-gray-900 text-white rounded-2xl hover:bg-black font-bold shadow-lg">
+                <button onClick={handleContactSeller} className="flex items-center justify-center gap-2 px-6 py-4 bg-gray-900 text-white rounded-2xl hover:bg-black font-bold shadow-lg transition-transform active:scale-95">
                   <ChatIcon size={20} /> Contact Seller
                 </button>
-                <button onClick={handleProposeExchange} className="flex items-center justify-center gap-2 px-6 py-4 bg-white text-gray-900 border-2 border-gray-900 rounded-2xl hover:bg-gray-50 font-bold">
+                <button onClick={handleProposeExchange} className="flex items-center justify-center gap-2 px-6 py-4 bg-white text-gray-900 border-2 border-gray-900 rounded-2xl hover:bg-gray-50 font-bold transition-transform active:scale-95">
                   <TagIcon size={20} /> Propose Exchange
                 </button>
               </div>

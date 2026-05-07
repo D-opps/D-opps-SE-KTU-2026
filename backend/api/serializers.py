@@ -1,5 +1,5 @@
 from rest_framework import serializers
-from .models import User, Machine, Product, ProductPhoto, Message, Conversation, ExchangeOffer, Favorite, Notification
+from .models import User, Machine, Product, ProductPhoto, Message, Conversation, ExchangeOffer, Favorite, Notification, Report
 from django.contrib.auth import get_user_model
 
 User = get_user_model()
@@ -10,6 +10,59 @@ class UserSerializer(serializers.ModelSerializer):
         fields = ['id', 'username', 'email', 'first_name', 'role', 'dormitory', 'room_number', 'photo']
 
 # serializers.py
+
+from rest_framework import serializers
+from .models import Report
+
+from rest_framework import serializers
+from .models import Report
+from django.contrib.contenttypes.models import ContentType # <--- ЦЬОГО НЕ ВИСТАЧАЛО
+
+from rest_framework import serializers
+from .models import Report, Product, User # Імпортуй потрібні моделі
+
+from django.contrib.contenttypes.models import ContentType
+from rest_framework import serializers
+from .models import Report, Product, User # Додай свої імпорти моделей
+
+class ReportSerializer(serializers.ModelSerializer):
+    reporter_name = serializers.ReadOnlyField(source='reporter.first_name')
+    reporter_email = serializers.ReadOnlyField(source='reporter.email')
+    content_details = serializers.SerializerMethodField()
+    model_name = serializers.CharField(write_only=True)
+
+    class Meta:
+        model = Report
+        fields = [
+            'id', 'reporter', 'reporter_name', 'reporter_email', 
+            'reason', 'description', 'status', 'created_at', 
+            'content_type', 'object_id', 'content_details', 'model_name'
+        ]
+        # ВАЖЛИВО: додаємо reporter у read_only
+        read_only_fields = ['reporter', 'status', 'created_at', 'content_type']
+
+    def get_content_details(self, obj):
+        # ... твій попередній код без змін ...
+        target = obj.content_object
+        return str(target) if target else "Об'єкт видалено"
+
+    def create(self, validated_data):
+        # Витягуємо model_name, щоб знайти ContentType
+        model_name = validated_data.pop('model_name').lower()
+        
+        try:
+            # Знаходимо потрібний тип контенту
+            from django.contrib.contenttypes.models import ContentType
+            ctype = ContentType.objects.get(model=model_name)
+            validated_data['content_type'] = ctype
+        except Exception:
+            raise serializers.ValidationError({"model_name": "Invalid model type"})
+
+        # ПРИВ'ЯЗУЄМО ЮЗЕРА: Беремо його з контексту запиту
+        validated_data['reporter'] = self.context['request'].user
+        
+        return super().create(validated_data)
+    
 class MachineSerializer(serializers.ModelSerializer):
     class Meta:
         model = Machine
@@ -172,4 +225,3 @@ class NotificationSerializer(serializers.ModelSerializer):
             'id', 'notification_type', 'title', 'description', 
             'target_id', 'is_read', 'created_at' # Тут має бути created_at
         ]
-    

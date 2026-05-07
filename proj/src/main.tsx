@@ -1,9 +1,8 @@
 import React from "react";
 import ReactDOM, { createRoot } from "react-dom/client";
 import App from "./app/App";
-import "./styles/index.css"; 
 import { GoogleOAuthProvider } from '@react-oauth/google';
-
+import "./styles/index.css"; 
 
 import * as Sentry from "@sentry/react";
 
