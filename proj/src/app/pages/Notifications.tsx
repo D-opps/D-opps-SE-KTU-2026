@@ -265,9 +265,9 @@ export function Notifications() {
     headers: { Authorization: `Bearer ${localStorage.getItem('access')}` }
   });
 
-  // useEffect(() => {
-  //   loadNotifications();
-  // }, []); mb uncomment later on !!!!!!!!!!!!!!!!!!
+   //useEffect(() => {
+     //loadNotifications();
+   //}, []); mb uncomment later on !!!!!!!!!!!!!!!!!! 
 
 
 //   const loadNotifications = async () => {
