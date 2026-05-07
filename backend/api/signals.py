@@ -100,3 +100,11 @@ def create_notification_on_event(sender, instance, created, **kwargs):
             )
         
         Notification.objects.bulk_create(notifications)
+from django.db.models.signals import post_save
+from django.dispatch import receiver
+from .models import AnalyticsEvent, User
+
+@receiver(post_save, sender=User)
+def track_signup(sender, instance, created, **kwargs):
+    if created:
+        AnalyticsEvent.objects.create(event_type='signup', user=instance)

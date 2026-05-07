@@ -107,6 +107,8 @@ class ProductViewSet(viewsets.ModelViewSet):
 
     def perform_create(self, serializer):
         serializer.save(seller=self.request.user)
+        product = serializer.save(seller=self.request.user)
+        AnalyticsEvent.objects.create(event_type='listing_created', user=self.request.user)
     @action(detail=True, methods=['post'])
     def favorite(self, request, pk=None):
         product = self.get_object()
@@ -590,3 +592,38 @@ class ReportViewSet(viewsets.ModelViewSet):
         report.handled_by = request.user
         report.save()
         return Response({"message": message})
+    
+from rest_framework.views import APIView
+from rest_framework.response import Response
+from rest_framework.permissions import IsAdminUser
+from .models import AnalyticsEvent, Product, User
+from django.utils import timezone
+from datetime import timedelta
+
+class DashboardMetricsView(APIView):
+    permission_classes = [IsAuthenticated] # Only PO/Admins see this
+
+    def get(self, request):
+        today = timezone.now().date()
+        
+        data = {
+            "total_users": User.objects.count(),
+            "total_listings": Product.objects.count(),
+            "signups_today": AnalyticsEvent.objects.filter(event_type='signup', created_at__date=today).count(),
+            "listings_today": AnalyticsEvent.objects.filter(event_type='listing_created', created_at__date=today).count(),
+            "active_chats_today": AnalyticsEvent.objects.filter(event_type='chat_session', created_at__date=today).count(),
+        }
+        return Response(data)
+    
+from rest_framework.decorators import api_view, permission_classes
+from rest_framework.permissions import IsAuthenticated
+from .models import AnalyticsEvent
+
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
+def track_event_manual(request):
+    event_type = request.data.get('event_type')
+    if event_type:
+        AnalyticsEvent.objects.create(event_type=event_type, user=request.user)
+        return Response({"status": "tracked"})
+    return Response({"error": "no event type"}, status=400)

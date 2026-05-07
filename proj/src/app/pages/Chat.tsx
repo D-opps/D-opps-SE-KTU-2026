@@ -175,6 +175,22 @@ export function Chat() {
     (acc, c) => acc + (c.unread_count || 0),
     0
   );
+  useEffect(() => {
+    const trackChatActivity = async () => {
+      try {
+        const token = localStorage.getItem('accessToken');
+        // Шлемо запит на новий ендпоїнт ручного трекінгу
+        await axios.post('http://127.0.0.1:8000/api/analytics/track/', 
+          { event_type: 'chat_session' }, 
+          { headers: { Authorization: `Bearer ${token}` } }
+        );
+      } catch (e) {
+        console.error("Analytics error", e);
+      }
+    };
+
+    trackChatActivity();
+  }, []);
 
   /* ================= UI ================= */
 

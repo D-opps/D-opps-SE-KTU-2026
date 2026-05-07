@@ -8,7 +8,7 @@ from rest_framework.routers import DefaultRouter
 from api import views 
 from api.views import (
     CreateReportView, GoogleLoginView, MachineViewSet, ReportViewSet, NotificationViewSet, ProductViewSet, 
-    ProfileView, RegisterView, ConversationViewSet, MessageViewSet, EventViewSet, ReportViewSet
+    ProfileView, RegisterView, ConversationViewSet, MessageViewSet, EventViewSet, ReportViewSet, DashboardMetricsView, track_event_manual
 )
 from rest_framework_simplejwt.views import TokenObtainPairView, TokenRefreshView
 
@@ -25,9 +25,11 @@ urlpatterns = [
     
     path('api/', include([
         path('', include(router.urls)),
-        
+        path('reports/create/', CreateReportView.as_view(), name='report-create'),
+        path('analytics/track/', track_event_manual, name='track-event'),
+        path('admin/metrics/', DashboardMetricsView.as_view(), name='admin-metrics'),
+        path('admin/analytics/', DashboardMetricsView.as_view(), name='admin-analytics'), # Теж саме, що й метрики
         # Спеціальні ендпоінти
-        path('metrics/', ConversationViewSet.as_view({'get': 'metrics'})),
         path('recent_messages/', ConversationViewSet.as_view({'get': 'recent_messages'})),
         
         path('register/', RegisterView.as_view(), name='register'),
@@ -43,7 +45,7 @@ urlpatterns = [
         path('users/me/', views.get_me),
         path('users/search/', views.search_user_by_email),
         path('api/reports/create/', CreateReportView.as_view(), name='report-create'),
-      ])),
+       ])),
     
     path('api-auth/', include('rest_framework.urls')),
 ]

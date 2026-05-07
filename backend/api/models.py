@@ -247,3 +247,22 @@ class Report(models.Model):
         # Використовуємо тернарний оператор для перевірки на None
         content_name = self.content_type.name if self.content_type else "Unknown Type"
         return f"Report by {self.reporter.username} on {content_name}"
+    
+from django.db import models
+from django.contrib.auth import get_user_model
+
+User = get_user_model()
+
+class AnalyticsEvent(models.Model):
+    EVENT_TYPES = [
+        ('signup', 'User Signup'),
+        ('listing_created', 'Marketplace Listing Created'),
+        ('chat_session', 'Active Chat Session'),
+    ]
+    
+    event_type = models.CharField(max_length=50, choices=EVENT_TYPES)
+    user = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ['-created_at']

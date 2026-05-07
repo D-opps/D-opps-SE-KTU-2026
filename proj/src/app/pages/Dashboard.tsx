@@ -60,7 +60,8 @@ export function Dashboard() {
         fetch(`http://127.0.0.1:8000/api/metrics/?period=${metricsPeriod}`, { headers }),
         fetch(`http://127.0.0.1:8000/api/machines/`, { headers }),
         fetch(`http://127.0.0.1:8000/api/recent_messages/`, { headers }), // Твій новий ендпоінт
-        fetch(`http://127.0.0.1:8000/api/profile/`, { headers }) // ДЛЯ ПЕРЕВІРКИ РОЛІ
+        fetch(`http://127.0.0.1:8000/api/profile/`, { headers }),
+        fetch(`http://127.0.0.1:8000/api/admin/metrics/`, { headers }) // ДЛЯ ПЕРЕВІРКИ РОЛІ
       ]);
 
       if (metricsRes.ok) setMetrics(await metricsRes.json());

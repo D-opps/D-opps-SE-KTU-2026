@@ -10,12 +10,12 @@ import { Marketplace } from "./pages/Marketplace";
 import { ItemDetails } from "./pages/ItemDetails";
 import { Chat } from "./pages/Chat";
 import { Profile } from "./pages/Profile";
-// import App from "./App";
 import { Events } from "./pages/Events";
 import { Notifications } from "./pages/Notifications";
 import ReportPage from "./pages/Report";
 import ReportDashboard from "./pages/ReportDashboard";
-
+// 1. ІМПОРТУЙ ТУТ СВОЮ СТОРІНКУ АНАЛІТИКИ
+import { AnalyticsDashboard } from "./pages/AnalyticsDashboard"; 
 
 export const router = createBrowserRouter([
   {
@@ -42,13 +42,15 @@ export const router = createBrowserRouter([
       { path: "laundry", Component: Laundry },
       { path: "marketplace", Component: Marketplace },
       { path: "marketplace/:itemId", Component: ItemDetails },
-      { path: "chat", Component: Chat },           // Відкриє список чатів
-      { path: "chat/:chatId", Component: Chat },    // Відкриє конкретний чат за ID
-      { path: "profile", Component: Profile },
-      {path: "events", Component: Events},
-      {path: "notifications", Component: Notifications},
-      {path: "report/:type/:id", Component: ReportPage },
-      {path: "admin/reports", Component: ReportDashboard},
+      { path: "chat", Component: Chat },
+      { path: "chat/:chatId", Component: Chat },
+      { path: "profile", Component: Profile },
+      { path: "events", Component: Events },
+      { path: "notifications", Component: Notifications },
+      { path: "report/:type/:id", Component: ReportPage },
+      { path: "admin/reports", Component: ReportDashboard },
+      // 2. ДОДАЙ ЦЕЙ ШЛЯХ ТУТ
+      { path: "admin/analytics", Component: AnalyticsDashboard },
     ],
   },
 ]);
