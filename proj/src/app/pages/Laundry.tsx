@@ -3,6 +3,7 @@ import {
   WashingMachine, Wind, Plus, Clock, 
   Building2, AlertTriangle, X, Check, Loader2, Trash2, ArrowRight
 } from 'lucide-react';
+import { toast, Toaster } from 'react-hot-toast'; // Імпорт для Success Messages
 
 type MachineStatus = 'free' | 'occupied' | 'out-of-order';
 
@@ -24,7 +25,13 @@ export function Laundry() {
   const [selectedMachineId, setSelectedMachineId] = useState<number | null>(null);
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   
-  // Форма нової машинки (без location і dormitory - вони автоматичні)
+  // Стан для валідації
+  const [formErrors, setFormErrors] = useState({
+    name: false,
+    timer: false
+  });
+
+  // Форма нової машинки
   const [newMachine, setNewMachine] = useState({
     name: '',
     type: 'washer' as 'washer' | 'dryer',
@@ -38,7 +45,6 @@ export function Laundry() {
   const fetchData = useCallback(async () => {
     if (!token) return;
     try {
-      // 1. Спочатку отримуємо профіль, щоб знати гуртожиток
       const profileRes = await fetch('http://127.0.0.1:8000/api/profile/', {
         headers: { 'Authorization': `Bearer ${token}` }
       });
@@ -46,7 +52,6 @@ export function Laundry() {
       const dorm = profileData.profile?.dormitory || profileData.dormitory;
       setUserDorm(dorm);
 
-      // 2. Отримуємо машинки
       const res = await fetch('http://127.0.0.1:8000/api/machines/', {
         headers: { 'Authorization': `Bearer ${token}` }
       });
@@ -67,8 +72,17 @@ export function Laundry() {
     return () => clearInterval(interval);
   }, [fetchData]);
 
+  // Створення машинки з валідацією
   const handleCreateMachine = async (e: React.FormEvent) => {
     e.preventDefault();
+
+    // Visual Alert Logic: перевірка на порожнє ім'я
+    if (newMachine.name.trim() === '') {
+      setFormErrors(prev => ({ ...prev, name: true }));
+      toast.error("Machine name cannot be empty!");
+      return;
+    }
+
     try {
       const res = await fetch('http://127.0.0.1:8000/api/machines/', {
         method: 'POST',
@@ -76,23 +90,32 @@ export function Laundry() {
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${token}`
         },
-        // Бекенд сам візьме dormitory з request.user
         body: JSON.stringify({
           ...newMachine,
           dormitory: userDorm 
         })
       });
       if (res.ok) {
+        toast.success("Machine added successfully!"); // Success Message
         setIsAddModalOpen(false);
         setNewMachine({ name: '', type: 'washer' });
+        setFormErrors({ name: false, timer: false });
         fetchData();
       }
     } catch (err) {
-      alert("Error creating machine");
+      toast.error("Error creating machine");
     }
   };
 
+  // Оновлення статусу з валідацією таймера
   const handleStatusUpdate = async (id: number, newStatus: MachineStatus, minutes: number = 0) => {
+    // Валідація: запобігання від'ємному часу
+    if (newStatus === 'occupied' && minutes < 0) {
+      setFormErrors(prev => ({ ...prev, timer: true }));
+      toast.error("Timer cannot be negative!");
+      return;
+    }
+
     try {
       const res = await fetch(`http://127.0.0.1:8000/api/machines/${id}/report_status/`, {
         method: 'POST',
@@ -103,21 +126,30 @@ export function Laundry() {
         body: JSON.stringify({ status: newStatus, minutes: Number(minutes) })
       });
       if (res.ok) {
+        toast.success(`Machine is now ${newStatus}`);
         fetchData();
         setSelectedMachineId(null);
+        setFormErrors({ name: false, timer: false });
       }
-    } catch (e) { alert("Failed to update"); }
+    } catch (e) { 
+      toast.error("Failed to update status"); 
+    }
   };
 
   const handleDeleteMachine = async (id: number) => {
     if (!window.confirm("Delete machine?")) return;
     try {
-      await fetch(`http://127.0.0.1:8000/api/machines/${id}/`, {
+      const res = await fetch(`http://127.0.0.1:8000/api/machines/${id}/`, {
         method: 'DELETE',
         headers: { 'Authorization': `Bearer ${token}` }
       });
-      fetchData();
-    } catch (err) { console.error(err); }
+      if (res.ok) {
+        toast.success("Machine deleted");
+        fetchData();
+      }
+    } catch (err) { 
+      toast.error("Delete failed");
+    }
   };
 
   if (loading) return (
@@ -128,6 +160,7 @@ export function Laundry() {
 
   return (
     <div className="p-4 lg:p-8 bg-[#F8F9FA] min-h-screen">
+      <Toaster position="top-right" /> {/* Контейнер для сповіщень */}
       
       {/* HEADER */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-10">
@@ -178,7 +211,11 @@ export function Laundry() {
           machine={machines.find(m => m.id === selectedMachineId)}
           timerMinutes={timerMinutes}
           setTimerMinutes={setTimerMinutes}
-          onClose={() => setSelectedMachineId(null)}
+          hasTimerError={formErrors.timer}
+          onClose={() => {
+            setSelectedMachineId(null);
+            setFormErrors({ name: false, timer: false });
+          }}
           onConfirm={handleStatusUpdate}
         />
       )}
@@ -190,11 +227,16 @@ export function Laundry() {
             <h2 className="text-2xl font-bold text-[#1A1D1F] mb-6">New Machine</h2>
             <div className="space-y-4">
               <input 
-                required
                 placeholder="Machine Name (e.g. LG #1)"
-                className="w-full p-4 rounded-xl bg-gray-50 border-none font-bold outline-none focus:ring-2 focus:ring-blue-400 transition-all"
+                // Visual Alert: Червона рамка при помилці
+                className={`w-full p-4 rounded-xl bg-gray-50 border-2 font-bold outline-none transition-all ${
+                  formErrors.name ? 'border-red-500 ring-2 ring-red-100' : 'border-transparent focus:ring-2 focus:ring-blue-400'
+                }`}
                 value={newMachine.name}
-                onChange={e => setNewMachine({...newMachine, name: e.target.value})}
+                onChange={e => {
+                  setNewMachine({...newMachine, name: e.target.value});
+                  if (formErrors.name) setFormErrors({ ...formErrors, name: false });
+                }}
               />
               <div className="flex gap-2">
                 {['washer', 'dryer'].map(t => (
@@ -209,7 +251,7 @@ export function Laundry() {
                 ))}
               </div>
               <div className="pt-2">
-                <button type="submit" className="w-full bg-[#2A85FF] text-white py-4 rounded-xl font-bold shadow-lg shadow-blue-100 transition-all">
+                <button type="submit" className="w-full bg-[#2A85FF] text-white py-4 rounded-xl font-bold shadow-lg shadow-blue-100 transition-all active:scale-[0.98]">
                   Create in Dorm #{userDorm}
                 </button>
                 <button type="button" onClick={() => setIsAddModalOpen(false)} className="w-full py-3 text-gray-400 text-sm font-bold mt-2">Cancel</button>
@@ -269,7 +311,7 @@ function MachineCard({ machine, isAdmin, onUpdate, onDelete }: any) {
   );
 }
 
-function StatusModal({ machine, timerMinutes, setTimerMinutes, onClose, onConfirm }: any) {
+function StatusModal({ machine, timerMinutes, setTimerMinutes, onClose, onConfirm, hasTimerError }: any) {
   return (
     <div className="fixed inset-0 bg-[#1A1D1F]/40 backdrop-blur-sm flex items-center justify-center p-4 z-50">
       <div className="bg-white rounded-3xl p-8 max-w-sm w-full shadow-2xl">
@@ -292,11 +334,14 @@ function StatusModal({ machine, timerMinutes, setTimerMinutes, onClose, onConfir
               <input 
                 type="number" value={timerMinutes} 
                 onChange={(e) => setTimerMinutes(Number(e.target.value))}
-                className="w-16 p-2 rounded-lg border-none font-bold text-center"
+                // Visual Alert: Червона рамка для таймера
+                className={`w-16 p-2 rounded-lg font-bold text-center border-2 outline-none transition-all ${
+                  hasTimerError ? 'border-red-500 bg-red-50' : 'border-transparent'
+                }`}
               />
               <button 
                 onClick={() => onConfirm(machine.id, 'occupied', timerMinutes)}
-                className="flex-1 bg-[#2A85FF] text-white rounded-lg font-bold text-sm"
+                className="flex-1 bg-[#2A85FF] text-white rounded-lg font-bold text-sm hover:bg-blue-600 transition-colors"
               >
                 Start Session
               </button>
