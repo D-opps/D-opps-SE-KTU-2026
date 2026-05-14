@@ -173,14 +173,10 @@ class GoogleLoginView(views.APIView):
         first_name = user_data.get('given_name', user_data.get('name', ''))
 
         # Шукаємо або створюємо користувача
-        user, created = User.objects.get_or_create(
-            email=email,
-            defaults={
-                'username': email,
-                'first_name': first_name,
-                'role': 'student'
-            }
-        )
+        try:
+            user = User.objects.get(email=email)
+        except User.DoesNotExist:
+            return Response({"error": "Register first"}, status=403)
 
         refresh = RefreshToken.for_user(user)
         
