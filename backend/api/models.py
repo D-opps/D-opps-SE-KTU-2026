@@ -22,17 +22,36 @@ class User(AbstractUser):
     REQUIRED_FIELDS = ['username']
 
 class Product(models.Model):
+    # Визначаємо список категорій (код для бази, назва для людей)
+    CATEGORY_CHOICES = [
+        ('electronics', 'Electronics'),
+        ('furniture', 'Furniture'),
+        ('books', 'Books'),
+        ('clothing', 'Clothing'),
+        ('appliances', 'Appliances'),
+        ('other', 'Other'),
+    ]
+
     title = models.CharField(max_length=200)
     price = models.DecimalField(max_digits=10, decimal_places=2)
     description = models.TextField()
-    category = models.CharField(max_length=100)
+    
+    # Оновлюємо це поле:
+    category = models.CharField(
+        max_length=50, 
+        choices=CATEGORY_CHOICES, 
+        default='other'
+    )
+    
     image = models.ImageField(upload_to='products/')
     seller = models.ForeignKey(User, on_delete=models.CASCADE, related_name='products')
     status = models.CharField(max_length=20, default='available')
     created_at = models.DateTimeField(auto_now_add=True)
     is_used = models.BooleanField(default=False)    
-    # ДОДАЙ ЦЕ:
     is_flagged = models.BooleanField(default=False)
+
+    def __str__(self):
+        return f"{self.title} ({self.get_category_display()})"
 
 class Machine(models.Model):
     TYPE_CHOICES = (('washer', 'Washer'), ('dryer', 'Dryer'))
