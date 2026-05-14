@@ -9,6 +9,7 @@
 ## Table of Contents
 
 1. [Project Overview](#1-project-overview)
+1.1.[Use Case Diagram](#1.1-case-diagram)
 2. [Tech Stack](#2-tech-stack)
 3. [Project Structure](#3-project-structure)
 4. [Database Models](#4-database-models)
@@ -20,7 +21,7 @@
 10. [Setup & Running Locally](#10-setup--running-locally)
 11. [Git Branching Strategy](#11-git-branching-strategy)
 12. [Deployment Notes](#12-deployment-notes)
-
+13. [CI/CD Pipeline](#13-CI/CD-pipeline)
 ---
 
 ## 1. Project Overview
@@ -36,6 +37,18 @@ DormLife is a student-focused web application designed to improve dormitory life
 The application supports three user roles — **Student**, **Admin**, and **Doorkeeper** — each with different levels of access and functionality.
 
 ---
+### 1.1 Use Case Diagram
+
+The following diagram illustrates the primary interactions between the different user roles and the system modules.
+
+
+
+**Key Interaction Flows:**
+* **Student:** Manages Marketplace listings, tracks Laundry availability in real-time, participates in Chat rooms, and manages Event RSVPs.
+* **Admin:** Monitors system-wide Metrics, manages Laundry infrastructure, and oversees user roles.
+* **Doorkeeper:** Accesses dormitory security features and building-specific logs.
+
+--- 
 
 ## 2. Tech Stack
 
@@ -99,7 +112,7 @@ D-opps-SE-KTU-2026/
 │           │   ├── Chat.tsx
 │           │   ├── Profile.tsx
 │           │   ├── Events.tsx
-│           │   └── Notifications.tsx
+│           │   └── ... existing pages
 │           └── data/
 │               └── mockData.ts    # Development mock data
 └── backend/                       # Backend (Django)
@@ -333,11 +346,11 @@ Page: `Notifications`
 - Polling every 30 seconds for new notifications
 
 ### Events Module
-Page: `Events`
+Pages: `Events`
 
 - View upcoming dormitory events
 - Community event management
-
+- **RSVP System:** Students can confirm attendance, and organizers can track the expected number of participants.
 ---
 
 ## 8. Frontend Routing
@@ -449,3 +462,65 @@ When deploying to a production environment, the following changes are required:
 | Media files | Set up cloud storage (e.g. AWS S3) for uploaded images |
 | Frontend API URL | Update base URL from `localhost:8000` to production API domain |
 | Google OAuth | Register production domain in Google Cloud Console |
+
+---
+## 13. CI/CD Pipeline & Automation
+
+To ensure reproducible deployments and code quality, the project utilizes GitHub Actions for automated testing and delivery.
+
+### Deployment Workflow (.github/workflows/deploy.yml)
+
+The pipeline is triggered on every push to the `main` branch and consists of the following stages:
+
+1. **Lint & Test:** Validates Python syntax and runs React build checks.
+2. **Security Scan:** Checks for exposed secrets and vulnerable dependencies.
+3. **Production Build:** Generates optimized frontend assets via Vite.
+4. **Automated Deploy:** Syncs code to the production server, runs migrations, and restarts services.
+
+```yaml
+name: DormLife CI/CD Pipeline
+
+on:
+  push:
+    branches: [ main ]
+
+jobs:
+  build-and-test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Setup Python & Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      - name: Install & Build
+        run: |
+          cd proj && npm install && npm run build
+          cd ../backend && pip install -r requirements.txt
+
+  deploy:
+    needs: build-and-test
+    runs-on: ubuntu-latest
+    steps:
+      - name: Deploy via SSH
+        uses: appleboy/ssh-action@master
+        with:
+          host: ${{ secrets.PROD_HOST }}
+          username: ${{ secrets.PROD_USER }}
+          key: ${{ secrets.PROD_SSH_KEY }}
+          script: |
+            cd /var/www/DormLife
+            git pull origin main
+            source venv/bin/activate
+            python backend/manage.py migrate --noinput
+            sudo systemctl restart gunicorn
+```
+
+Rollback Strategy
+If a deployment fails, the system follows a 3-step rollback:
+
+Revert: The main branch is reset to the last stable git tag.
+
+Re-deploy: The CI/CD pipeline triggers automatically for the reverted version.
+
+DB Recovery: If migrations were destructive, a database snapshot is restored from the daily backup.
