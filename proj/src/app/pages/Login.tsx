@@ -75,11 +75,19 @@ export function Login() {
         const response = await axios.post('http://127.0.0.1:8000/api/auth/google/', {
           token: tokenResponse.access_token,
         });
+        
         const { access, refresh, user } = response.data;
         saveAuthData(access, refresh, user);
+        toast.success('Welcome back!');
         navigate('/');
-      } catch (err) {
-        toast.error('Google Login Failed');
+      } catch (err: any) {
+        // ЦЕ ТЕ, ЩО ТРЕБА ДОДАТИ ЗАРАЗ:
+        if (err.response && err.response.status === 403) {
+          toast.error('Account not found. Please register manually first!');
+          setError('User not registered. Go to Register page.');
+        } else {
+          toast.error('Google Login Failed');
+        }
       } finally {
         setLoading(false);
       }

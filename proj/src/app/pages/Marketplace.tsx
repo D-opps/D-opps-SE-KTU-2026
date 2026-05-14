@@ -28,7 +28,7 @@ export function Marketplace() {
   const [loading, setLoading] = useState(true);
 
   const [search, setSearch] = useState('');
-  const [category, setCategory] = useState('all');
+  const [category, setCategory] = useState('All');
   const [showFilters, setShowFilters] = useState(false);
 
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -36,17 +36,14 @@ export function Marketplace() {
   const [form, setForm] = useState({
     name: '',
     price: '',
-    category: 'Electronics',
+    category: 'Electronics', 
     description: '',
     is_used: false,
   });
 
   const [preview, setPreview] = useState<string | null>(null);
 
-  const categories = [
-    'all', 'Favorites', 'Electronics', 'Furniture',
-    'Books', 'Clothing', 'Appliances', 'Other'
-  ];
+  const categories = ['All', 'Favorites', 'Electronics', 'Furniture', 'Books', 'Clothing', 'Appliances', 'Other'];
 
   const fetchItems = async () => {
     try {
@@ -109,17 +106,17 @@ export function Marketplace() {
   };
 
   const filtered = items.filter(item => {
-    const matchesSearch = item.name.toLowerCase().includes(search.toLowerCase());
+  const matchesSearch = item.name.toLowerCase().includes(search.toLowerCase());
 
-    const matchesCategory =
-      category === 'all'
-        ? true
-        : category === 'Favorites'
-          ? favorites.includes(item.id)
-          : item.category === category;
+  const matchesCategory =
+    category === 'All'
+      ? true
+      : category === 'Favorites'
+        ? favorites.includes(item.id)
+        : item.category.toLowerCase() === category.toLowerCase(); // Додаємо toLowerCase()
 
-    return matchesSearch && matchesCategory;
-  });
+  return matchesSearch && matchesCategory;
+});
 
   const handleImageChange = (file?: File) => {
     if (!file) return;
