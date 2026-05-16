@@ -1,16 +1,47 @@
-name: DormLife Backend CI
+name: DormLife CI/CD Pipeline
 
 on:
   push:
-    branches: [ "main", "DOSK2-177" ]
+    # Зірочки '**' означають запуск на ВСІХ гілках (старих, нових, фіча-гілках тощо)
+    branches:
+      - '**'
   pull_request:
-    branches: [ "main" ]
+    # Запуск для будь-якого Pull Request у будь-яку цільову гілку
+    branches:
+      - '**'
+  # Автоматичний запуск щовечора (Every eve) о 23:00 UTC для інкременту версії
+  schedule:
+    - cron: '0 23 * * *'
 
 jobs:
+  # 1. ЕТАП ВИЗНАЧЕННЯ ЗМІН (Path-based filtering)
+  detect-changes:
+    runs-on: ubuntu-latest
+    if: github.event_name == 'push' || github.event_name == 'pull_request'
+    outputs:
+      backend: ${{ steps.filter.outputs.backend }}
+      frontend: ${{ steps.filter.outputs.frontend }}
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Check which paths were modified
+        id: filter
+        uses: dorny/paths-filter@v3
+        with:
+          filters: |
+            backend:
+              - 'backend/**'
+            frontend:
+              - 'proj/**'
+
+  # 2. ДЖОБ ДЛЯ БЕКЕНДУ (Django)
   test-backend:
+    needs: detect-changes
+    # Запускається при cron-запуску АБО якщо змінено файли в паці backend
+    if: always() && (github.event_name == 'schedule' || needs.detect-changes.outputs.backend == 'true')
     runs-on: ubuntu-latest
     
-    # Вказуємо, що команди мають виконуватися всередині папки backend
     defaults:
       run:
         working-directory: ./backend
@@ -31,8 +62,62 @@ jobs:
 
       - name: Run Django Tests
         env:
-          # Передаємо секрети, які ти додала в Settings -> Secrets
           SECRET_KEY: ${{ secrets.DJANGO_SECRET_KEY }}
           EMAIL_HOST_PASSWORD: ${{ secrets.EMAIL_PASSWORD }}
         run: |
           python manage.py test
+
+  # 3. ЕТАП ФРОНТЕНДУ (React)
+  test-frontend:
+    needs: detect-changes
+    if: always() && (github.event_name == 'schedule' || needs.detect-changes.outputs.frontend == 'true')
+    runs-on: ubuntu-latest
+    
+    defaults:
+      run:
+        working-directory: ./proj
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Install Dependencies & Build
+        run: |
+          npm install
+          npm run build --if-present
+
+  # 4. ЩОВЕЧІРНІЙ АВТО-ІНКРЕМЕНТ (Спрацьовує по cron для головної гілки)
+  nightly-version-bump:
+    if: github.event_name == 'schedule'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Main/Master Branch
+        uses: actions/checkout@v4
+        with:
+          ref: main # Якщо ваша головна гілка називається master, змініть на master
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Increment Build Index in index.php
+        run: |
+          echo "Executing nightly automated build index increment..."
+          
+          if [ -f "index.php" ]; then
+            sed -i -E 's/(Build:\s*)([0-9]+)/echo "\1$((\2+1))"/e' index.php
+            echo "Successfully incremented version in index.php"
+          else
+            echo "index.php not found, creating a baseline file..."
+            echo "<?php // Build: 1 ?>" > index.php
+          fi
+
+      - name: Commit and Push Changes
+        run: |
+          git config --global user.name "github-actions[bot]"
+          git config --global user.email "github-actions[bot]@users.noreply.github.com"
+          git add index.php
+          git commit -m "chore: nightly auto-increment build version [skip ci]" || echo "No changes to commit"
+          git push origin main
