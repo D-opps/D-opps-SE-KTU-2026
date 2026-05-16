@@ -12,7 +12,9 @@ on:
   # Автоматичний запуск щовечора (Every eve) о 23:00 UTC для інкременту версії
   schedule:
     - cron: '0 23 * * *'
-
+permissions:
+  contents: write      # Потрібно для пушу оновленого index.php ввечері
+  pull-requests: read  # ЦЕ ВИПРАВИТЬ ПОМИЛКУ: дозволяє читати список змінених файлів в PR
 jobs:
   # 1. ЕТАП ВИЗНАЧЕННЯ ЗМІН (Path-based filtering)
   detect-changes:
