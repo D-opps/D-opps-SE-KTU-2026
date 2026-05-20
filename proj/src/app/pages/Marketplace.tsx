@@ -19,6 +19,18 @@ type MarketplaceItem = {
   is_used: boolean;
 };
 
+// Текстові назви для створення (точно як у вашій базі: "Electronics", "Furniture"...)
+const DB_CATEGORIES = [
+  { id: 'electronics', name: 'Electronics' },
+  { id: 'furniture', name: 'Furniture' },
+  { id: 'books', name: 'Books' },
+  { id: 'clothing', name: 'Clothing' },
+  { id: 'appliances', name: 'Appliances' },
+  { id: 'other', name: 'Other' }
+];
+
+const FILTER_CATEGORIES = ['All', 'Favorites', 'Electronics', 'Furniture', 'Books', 'Clothing', 'Appliances', 'Other'];
+
 export function Marketplace() {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const BASE_URL = 'http://127.0.0.1:8000';
@@ -36,14 +48,12 @@ export function Marketplace() {
   const [form, setForm] = useState({
     name: '',
     price: '',
-    category: 'Electronics', 
+    category: 'electronics', // Рядок з великої літери за замовчуванням
     description: '',
     is_used: false,
   });
 
   const [preview, setPreview] = useState<string | null>(null);
-
-  const categories = ['All', 'Favorites', 'Electronics', 'Furniture', 'Books', 'Clothing', 'Appliances', 'Other'];
 
   const fetchItems = async () => {
     try {
@@ -56,24 +66,26 @@ export function Marketplace() {
 
       const data = res.data.results || res.data;
 
-      const formatted: MarketplaceItem[] = data.map((item: any) => ({
+      // Переконуємося, що дані мапляться без помилок типів
+      const formatted: MarketplaceItem[] = Array.isArray(data) ? data.map((item: any) => ({
         id: item.id.toString(),
         seller_id: item.seller_id?.toString(),
-        name: item.title,
-        price: Number(item.price),
+        name: item.title || '',
+        price: Number(item.price) || 0,
         category: item.category || 'Other',
-        description: item.description,
+        description: item.description || '',
         image: item.image?.startsWith('http')
           ? item.image
-          : `${BASE_URL}${item.image}`,
+          : `${BASE_URL}${item.image || ''}`,
         is_favorite: item.is_favorite || false,
         is_used: item.is_used || false,
-      }));
+      })) : [];
 
       setItems(formatted);
       setFavorites(formatted.filter(i => i.is_favorite).map(i => i.id));
 
-    } catch {
+    } catch (err) {
+      console.error('Fetch error:', err);
       toast.error('Failed to load marketplace');
     } finally {
       setLoading(false);
@@ -106,21 +118,20 @@ export function Marketplace() {
   };
 
   const filtered = items.filter(item => {
-  const matchesSearch = item.name.toLowerCase().includes(search.toLowerCase());
+    const matchesSearch = item.name.toLowerCase().includes(search.toLowerCase());
 
-  const matchesCategory =
-    category === 'All'
-      ? true
-      : category === 'Favorites'
-        ? favorites.includes(item.id)
-        : item.category.toLowerCase() === category.toLowerCase(); // Додаємо toLowerCase()
+    const matchesCategory =
+      category === 'All'
+        ? true
+        : category === 'Favorites'
+          ? favorites.includes(item.id)
+          : item.category.toLowerCase() === category.toLowerCase();
 
-  return matchesSearch && matchesCategory;
-});
+    return matchesSearch && matchesCategory;
+  });
 
   const handleImageChange = (file?: File) => {
     if (!file) return;
-
     const url = URL.createObjectURL(file);
     setPreview(url);
   };
@@ -129,11 +140,17 @@ export function Marketplace() {
     e.preventDefault();
 
     const token = localStorage.getItem('accessToken');
+    if (!token) {
+      toast.error('You must be logged in');
+      return;
+    }
 
     const formData = new FormData();
     formData.append('title', form.name);
     formData.append('price', form.price);
-    formData.append('category', form.category);
+    const cleanCategory = form.category.replace(/^["']|["']$/g, '').trim();
+    formData.append('category', cleanCategory);
+    //formData.append('category', form.category); // Передаємо чистий рядок 'Electronics'
     formData.append('description', form.description);
     formData.append('is_used', String(form.is_used));
 
@@ -154,7 +171,7 @@ export function Marketplace() {
       setForm({
         name: '',
         price: '',
-        category: 'Electronics',
+        category: 'electronics',
         description: '',
         is_used: false,
       });
@@ -162,8 +179,18 @@ export function Marketplace() {
 
       fetchItems();
 
-    } catch {
-      toast.error('Failed to create item');
+    } catch (err: any) {
+      console.error('Server response error:', err.response?.data);
+      
+      // Якщо сервер повернув конкретну помилку валідації полів, покажемо її в toast
+      if (err.response?.data) {
+        const errors = Object.entries(err.response.data)
+          .map(([key, value]) => `${key}: ${Array.isArray(value) ? value.join(', ') : value}`)
+          .join(' | ');
+        toast.error(`Error: ${errors}`);
+      } else {
+        toast.error('Failed to create item');
+      }
     }
   };
 
@@ -202,7 +229,7 @@ export function Marketplace() {
       {/* FILTERS */}
       {showFilters && (
         <div className="flex gap-2 mb-6 flex-wrap">
-          {categories.map(c => (
+          {FILTER_CATEGORIES.map(c => (
             <button
               key={c}
               onClick={() => setCategory(c)}
@@ -218,47 +245,52 @@ export function Marketplace() {
 
       {/* LIST */}
       {loading ? (
-        <Loader2 className="animate-spin mx-auto" />
-      ) : (
-        <div className="grid grid-cols-3 gap-6">
-          {filtered.map(item => (
-            <Link key={item.id} to={`/marketplace/${item.id}`} className="bg-white rounded-2xl overflow-hidden border relative">
-
-              {item.is_used && (
-                <span className="absolute top-3 left-3 bg-black text-white text-xs px-2 py-1 rounded">
-                  USED
-                </span>
-              )}
-
-              <img src={item.image} className="h-56 w-full object-cover" />
-
-              <div className="p-4">
-                <h3 className="font-bold">{item.name}</h3>
-                <p className="text-blue-600 font-black">${item.price}</p>
-              </div>
-
-              <button
-                onClick={(e) => toggleFavorite(e, item.id)}
-                className="absolute top-3 right-3"
-              >
-                <Heart className={favorites.includes(item.id) ? "fill-red-500 text-red-500" : ""} />
-              </button>
-
-            </Link>
-          ))}
+        <div className="flex justify-center p-12">
+          <Loader2 className="animate-spin text-blue-600" size={32} />
         </div>
+      ) : (
+        <>
+          {filtered.length === 0 ? (
+            <div className="text-center text-gray-500 py-12">No products found.</div>
+          ) : (
+            <div className="grid grid-cols-3 gap-6">
+              {filtered.map(item => (
+                <Link key={item.id} to={`/marketplace/${item.id}`} className="bg-white rounded-2xl overflow-hidden border relative block hover:shadow-md transition">
+                  {item.is_used && (
+                    <span className="absolute top-3 left-3 bg-black text-white text-xs px-2 py-1 rounded z-10">
+                      USED
+                    </span>
+                  )}
+
+                  <img src={item.image} className="h-56 w-full object-cover" alt={item.name} />
+
+                  <div className="p-4">
+                    <h3 className="font-bold text-gray-900">{item.name}</h3>
+                    <p className="text-blue-600 font-black">${item.price}</p>
+                  </div>
+
+                  <button
+                    onClick={(e) => toggleFavorite(e, item.id)}
+                    className="absolute top-3 right-3 z-10 p-1 bg-white/80 rounded-full backdrop-blur-sm"
+                  >
+                    <Heart className={favorites.includes(item.id) ? "fill-red-500 text-red-500" : "text-gray-600"} size={20} />
+                  </button>
+                </Link>
+              ))}
+            </div>
+          )}
+        </>
       )}
 
       {/* MODAL */}
       {isModalOpen && (
-        <div className="fixed inset-0 bg-black/40 flex items-center justify-center p-4">
+        <div className="fixed inset-0 bg-black/40 flex items-center justify-center p-4 z-50 animate-fade-in">
+          <form onSubmit={handleSubmit} className="bg-white w-[420px] p-6 rounded-2xl space-y-4 shadow-xl">
 
-          <form onSubmit={handleSubmit} className="bg-white w-[420px] p-6 rounded-2xl space-y-4">
-
-            <div className="flex justify-between">
+            <div className="flex justify-between items-center">
               <h2 className="font-bold text-xl">Create item</h2>
-              <button type="button" onClick={() => setIsModalOpen(false)}>
-                <X />
+              <button type="button" onClick={() => setIsModalOpen(false)} className="text-gray-500 hover:text-gray-700">
+                <X size={20} />
               </button>
             </div>
 
@@ -267,6 +299,7 @@ export function Marketplace() {
               value={form.name}
               onChange={(e) => setForm({ ...form, name: e.target.value })}
               className="w-full p-3 bg-gray-100 rounded-xl"
+              required
             />
 
             <input
@@ -275,55 +308,72 @@ export function Marketplace() {
               value={form.price}
               onChange={(e) => setForm({ ...form, price: e.target.value })}
               className="w-full p-3 bg-gray-100 rounded-xl"
+              required
             />
+
+            {/* СЕЛЕКТ КАТЕГОРІЙ */}
+            <div className="flex flex-col gap-1">
+              <label className="text-xs text-gray-500 pl-1">Select Category</label>
+              <select
+                value={form.category}
+                onChange={(e) => setForm({ ...form, category: e.target.value })}
+                className="w-full p-3 bg-gray-100 rounded-xl cursor-pointer"
+              >
+                {DB_CATEGORIES.map((c) => (
+                  <option key={c.id} value={c.id}>
+                    {c.name}
+                  </option>
+                ))}
+              </select>
+            </div>
 
             <textarea
               placeholder="Description"
               value={form.description}
               onChange={(e) => setForm({ ...form, description: e.target.value })}
-              className="w-full p-3 bg-gray-100 rounded-xl"
+              className="w-full p-3 bg-gray-100 rounded-xl h-24 resize-none"
+              required
             />
 
             {/* USED TOGGLE */}
-            <label className="flex items-center gap-2">
+            <label className="flex items-center gap-2 cursor-pointer select-none text-sm text-gray-700">
               <input
                 type="checkbox"
                 checked={form.is_used}
-                onChange={(e) =>
-                  setForm({ ...form, is_used: e.target.checked })
-                }
+                onChange={(e) => setForm({ ...form, is_used: e.target.checked })}
+                className="rounded text-blue-600 focus:ring-blue-500"
               />
               This is a used item
             </label>
 
             {/* IMAGE UPLOAD */}
-            <div className="border-2 border-dashed p-4 rounded-xl text-center">
+            <div className="border-2 border-dashed p-4 rounded-xl text-center border-gray-300 hover:border-blue-500 transition">
               <input
                 ref={fileInputRef}
                 type="file"
                 className="hidden"
+                accept="image/*"
                 onChange={(e) => handleImageChange(e.target.files?.[0])}
               />
 
               <button
                 type="button"
                 onClick={() => fileInputRef.current?.click()}
-                className="flex items-center gap-2 mx-auto text-gray-500"
+                className="flex items-center gap-2 mx-auto text-gray-500 font-medium hover:text-blue-600 transition"
               >
-                <Upload /> Upload image
+                <Upload size={18} /> Upload image
               </button>
 
               {preview && (
-                <img src={preview} className="mt-3 rounded-xl h-40 object-cover mx-auto" />
+                <img src={preview} className="mt-3 rounded-xl h-40 w-full object-cover mx-auto shadow-sm" alt="Preview" />
               )}
             </div>
 
-            <button className="w-full bg-blue-600 text-white py-3 rounded-xl font-bold">
+            <button type="submit" className="w-full bg-blue-600 text-white py-3 rounded-xl font-bold hover:bg-blue-700 transition">
               Publish
             </button>
 
           </form>
-
         </div>
       )}
 
