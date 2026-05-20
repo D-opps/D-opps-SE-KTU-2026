@@ -7,6 +7,11 @@ import axios from 'axios';
 vi.mock('axios');
 const mockedAxios = axios as any;
 
+
+vi.mock('axios');
+const mockedAxios = axios as any;
+
+
 describe('Analytics Dashboard Automation Test Suite', () => {
   it('should securely fetch datasets and populate metric nodes correctly', async () => {
     const mockMetricsData = {
@@ -21,6 +26,10 @@ describe('Analytics Dashboard Automation Test Suite', () => {
     mockedAxios.get.mockResolvedValueOnce(mockMetricsData);
 
     render(<AnalyticsDashboard />);
+
+
+    render(<AnalyticsDashboard />);
+
 
     await waitFor(() => {
       expect(screen.getByText('150')).toBeInTheDocument();
