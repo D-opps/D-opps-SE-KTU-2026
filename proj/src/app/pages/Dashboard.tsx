@@ -19,7 +19,7 @@ interface Metrics {
 
 interface Machine {
   id: number;
-  status: 'free' | 'occupied' | 'out-of-order'; // Змінено під твій Django models.py
+  status: 'free' | 'occupied' | 'out-of-order';
 }
 
 interface ChatMessage {
@@ -43,11 +43,8 @@ export function Dashboard() {
   const token = localStorage.getItem('accessToken');
 
   useEffect(() => {
-    // 1. Спочатку беремо те, що є в пам'яті
     const role = localStorage.getItem('userRole') || 'student';
     setUserRole(role);
-
-    // 2. Оновлюємо дані з сервера
     fetchAllData();
   }, [metricsPeriod]);
 
@@ -56,19 +53,33 @@ export function Dashboard() {
     try {
       const headers = { 'Authorization': `Bearer ${token}` };
 
+      // Запити до твого Django API
       const [metricsRes, machinesRes, messagesRes, profileRes] = await Promise.all([
-        fetch(`http://127.0.0.1:8000/api/metrics/?period=${metricsPeriod}`, { headers }),
+        fetch(`http://127.0.0.1:8000/api/admin/metrics/?period=${metricsPeriod}`, { headers }),
         fetch(`http://127.0.0.1:8000/api/machines/`, { headers }),
-        fetch(`http://127.0.0.1:8000/api/recent_messages/`, { headers }), // Твій новий ендпоінт
-        fetch(`http://127.0.0.1:8000/api/profile/`, { headers }),
-        fetch(`http://127.0.0.1:8000/api/admin/metrics/`, { headers }) // ДЛЯ ПЕРЕВІРКИ РОЛІ
+        fetch(`http://127.0.0.1:8000/api/recent_messages/`, { headers }),
+        fetch(`http://127.0.0.1:8000/api/profile/`, { headers })
       ]);
 
-      if (metricsRes.ok) setMetrics(await metricsRes.json());
+      if (metricsRes.ok) {
+        const rawMetrics = await metricsRes.json();
+        // Мапимо змінні з Django під твій React-інтерфейс
+        setMetrics({
+          totalUsers: rawMetrics.total_users || 0,
+          verifiedUsers: rawMetrics.signups_today || 0,
+          totalMessages: rawMetrics.active_chats_today || 0,
+          recentMessages: rawMetrics.active_chats_today || 0,
+          totalListings: rawMetrics.total_listings || 0,
+          activeListings: rawMetrics.listings_today || 0,
+          totalEvents: rawMetrics.total_events || 0,
+          recentEvents: rawMetrics.events_today || 0
+        });
+      }
+
       if (machinesRes.ok) setMachines(await machinesRes.json());
       if (messagesRes.ok) setMessages(await messagesRes.json());
       
-      // СИНХРОНІЗАЦІЯ РОЛІ
+      // СИНХРОНІЗАЦІЯ РОЛІ КОРИСТУВАЧА
       if (profileRes.ok) {
         const profileData = await profileRes.json();
         const realRole = profileData.profile.role;
@@ -88,9 +99,7 @@ export function Dashboard() {
     }
   };
 
-  // Рахуємо вільні машинки (статус 'free' з твого models.py)
-  const availableMachinesCount = machines.filter((m) => m.status === 'free').length;
-
+  // Показуємо індикатор завантаження, якщо дані ще не отримані
   if (loading && !metrics) {
     return (
       <div className="h-screen flex items-center justify-center">
@@ -98,6 +107,9 @@ export function Dashboard() {
       </div>
     );
   }
+
+  // Обчислення кількості вільних машинок (знаходиться точно перед головним return)
+  const availableMachinesCount = machines.filter((m) => m.status === 'free').length;
 
   return (
     <div className="p-4 lg:p-8 max-w-7xl mx-auto space-y-8">
@@ -114,7 +126,7 @@ export function Dashboard() {
         <Zap className="absolute right-[-20px] bottom-[-20px] w-64 h-64 text-white/10 rotate-12" />
       </div>
 
-      {/* ADMIN ANALYTICS - Показуємо тільки якщо роль admin */}
+      {/* ADMIN ANALYTICS - Відображається лише якщо роль користувача 'admin' */}
       {userRole === 'admin' && (
         <section className="space-y-4">
           <div className="flex items-center justify-between">
@@ -156,9 +168,9 @@ export function Dashboard() {
             <div key={msg.id} className="p-4 rounded-2xl bg-gray-50 hover:bg-gray-100 transition-colors">
               <div className="flex items-center gap-2 mb-2">
                 <div className="w-6 h-6 bg-indigo-500 rounded-full flex items-center justify-center text-[10px] font-bold text-white">
-                  {msg.sender_name[0]}
+                  {msg.sender_name ? msg.sender_name[0] : 'U'}
                 </div>
-                <span className="text-sm font-bold">{msg.sender_name}</span>
+                <span className="text-sm font-bold">{msg.sender_name || 'Anonymous'}</span>
                 <span className="text-[10px] text-gray-400 ml-auto">{msg.timestamp}</span>
               </div>
               <p className="text-sm text-gray-600 italic">"{msg.text}"</p>
@@ -172,38 +184,38 @@ export function Dashboard() {
   );
 }
 
-// Помічники (Cards)
+// --- Компоненти-помічники для карток метрик та навігації ---
 function MetricCard({ title, value, sub, label, icon, color }: any) {
-    const colors: any = {
-      blue: "text-blue-600 bg-blue-50",
-      purple: "text-purple-600 bg-purple-50",
-      green: "text-green-600 bg-green-50",
-      pink: "text-pink-600 bg-pink-50"
-    };
-    return (
-      <div className="bg-white rounded-3xl p-6 shadow-sm border border-gray-100">
-        <div className="flex items-center justify-between mb-4">
-          <div className={`p-3 rounded-2xl ${colors[color]}`}>{icon}</div>
-          <span className="text-[10px] font-black uppercase text-gray-400">{title}</span>
-        </div>
-        <p className="text-3xl font-black text-gray-900 mb-1">{value}</p>
-        <div className="flex items-center gap-1 text-sm font-bold">
-          <span className="text-green-600">+{sub}</span>
-          <span className="text-gray-400">{label}</span>
-        </div>
+  const colors: any = {
+    blue: "text-blue-600 bg-blue-50",
+    purple: "text-purple-600 bg-purple-50",
+    green: "text-green-600 bg-green-50",
+    pink: "text-pink-600 bg-pink-50"
+  };
+  return (
+    <div className="bg-white rounded-3xl p-6 shadow-sm border border-gray-100">
+      <div className="flex items-center justify-between mb-4">
+        <div className={`p-3 rounded-2xl ${colors[color]}`}>{icon}</div>
+        <span className="text-[10px] font-black uppercase text-gray-400">{title}</span>
       </div>
-    );
+      <p className="text-3xl font-black text-gray-900 mb-1">{value}</p>
+      <div className="flex items-center gap-1 text-sm font-bold">
+        <span className="text-green-600">+{sub}</span>
+        <span className="text-gray-400">{label}</span>
+      </div>
+    </div>
+  );
 }
 
 function DashboardCard({ to, title, value, desc, icon, color }: any) {
-    return (
-      <Link to={to} className="group bg-white rounded-3xl p-8 shadow-sm border border-gray-100 hover:border-blue-200 transition-all hover:shadow-lg">
-        <div className={`w-14 h-14 rounded-2xl flex items-center justify-center mb-6 group-hover:scale-110 transition-transform ${color}`}>
-          {icon}
-        </div>
-        <h3 className="text-xs font-bold text-gray-400 uppercase tracking-widest mb-1">{title}</h3>
-        <p className="text-2xl font-black text-gray-900 mb-2">{value}</p>
-        <p className="text-sm text-gray-400">{desc}</p>
-      </Link>
-    );
+  return (
+    <Link to={to} className="group bg-white rounded-3xl p-8 shadow-sm border border-gray-100 hover:border-blue-200 transition-all hover:shadow-lg">
+      <div className={`w-14 h-14 rounded-2xl flex items-center justify-center mb-6 group-hover:scale-110 transition-transform ${color}`}>
+        {icon}
+      </div>
+      <h3 className="text-xs font-bold text-gray-400 uppercase tracking-widest mb-1">{title}</h3>
+      <p className="text-2xl font-black text-gray-900 mb-2">{value}</p>
+      <p className="text-sm text-gray-400">{desc}</p>
+    </Link>
+  );
 }

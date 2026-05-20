@@ -1,26 +1,54 @@
 import React, { useEffect, useState } from 'react';
 import axios from 'axios';
-import { Users, ShoppingBag, MessageSquare, TrendingUp } from 'lucide-react';
+import { Users, ShoppingBag, MessageSquare, TrendingUp, ShieldAlert } from 'lucide-react';
 
 export function AnalyticsDashboard() {
     const [metrics, setMetrics] = useState<any>(null);
+    const [error, setError] = useState<string | null>(null);
 
     useEffect(() => {
         const fetchMetrics = async () => {
-                try {
-                    const token = localStorage.getItem('accessToken'); // Перевір назву ключа!
-                    const response = await axios.get('http://127.0.0.1:8000/api/admin/metrics/', {
-                        headers: { Authorization: `Bearer ${token}` }
-                    });
-                    setMetrics(response.data);
-                } catch (error) {
-                    console.error("Помилка 403: Перевір чи ти адмін і чи вірний токен", error);
+            try {
+                const token = localStorage.getItem('accessToken');
+                
+                // Якщо токена взагалі немає в браузері — одразу блокуємо
+                if (!token) {
+                    setError("Unauthorized: Please log in as an Admin.");
+                    return;
                 }
-            };
+
+                // Робимо запит на правильний ендпоінт
+                const response = await axios.get('http://127.0.0.1:8000/api/admin/metrics/', {
+                    headers: { Authorization: `Bearer ${token}` }
+                });
+                
+                setMetrics(response.data);
+            } catch (err: any) {
+                console.error("API Error:", err);
+                if (err.response && (err.response.status === 403 || err.response.status === 401)) {
+                    setError("Access Denied: Only administrators can view this dashboard.");
+                } else {
+                    setError("Failed to load metrics. Please try again later.");
+                }
+            }
+        };
+        
         fetchMetrics();
     }, []);
 
-    if (!metrics) return <div className="p-10 text-center">Loading Metrics...</div>;
+    // Якщо сталася помилка доступу (наприклад, зайшов звичайний студент)
+    if (error) {
+        return (
+            <div className="p-10 flex flex-col items-center justify-center text-center gap-4 min-h-[50vh]">
+                <ShieldAlert size={64} className="text-red-500 animate-pulse" />
+                <h2 className="text-2xl font-black text-gray-800">Restricted Access</h2>
+                <p className="text-gray-500 max-w-md">{error}</p>
+            </div>
+        );
+    }
+
+    // Поки дані вантажаться
+    if (!metrics) return <div className="p-10 text-center font-bold text-gray-400">Loading Metrics...</div>;
 
     const StatCard = ({ title, value, icon: Icon, color }: any) => (
         <div className="bg-white p-6 rounded-[2rem] shadow-sm border border-gray-100 flex items-center gap-5">
