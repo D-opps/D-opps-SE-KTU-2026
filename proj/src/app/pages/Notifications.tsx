@@ -481,6 +481,7 @@ const handleMarkAllAsRead = async () => {
               <option value="message">Messages</option>
               <option value="offer">Exchange Offers</option>
               <option value="event">Events</option>
+              <option value="system">System</option>
             </select>
           </div>
         </div>
