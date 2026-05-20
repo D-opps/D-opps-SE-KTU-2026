@@ -4,6 +4,9 @@ import { describe, it, expect, vi } from 'vitest';
 import { AnalyticsDashboard } from '../AnalyticsDashboard';
 import axios from 'axios';
 
+vi.mock('axios');
+const mockedAxios = axios as any;
+
 
 vi.mock('axios');
 const mockedAxios = axios as any;
@@ -21,6 +24,8 @@ describe('Analytics Dashboard Automation Test Suite', () => {
       }
     };
     mockedAxios.get.mockResolvedValueOnce(mockMetricsData);
+
+    render(<AnalyticsDashboard />);
 
 
     render(<AnalyticsDashboard />);
