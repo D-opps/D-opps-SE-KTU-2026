@@ -567,59 +567,59 @@ class ReportViewSet(viewsets.ModelViewSet):
 
     # Це дозволяє робити POST на /api/reports/manage/3/perform_action/
     @action(detail=True, methods=['post'])
-def perform_action(self, request, pk=None):
-    report = self.get_object()
-    action_type = request.data.get('action')
+    def perform_action(self, request, pk=None):
+        report = self.get_object()
+        action_type = request.data.get('action')
 
-    if action_type == 'dismiss':
-        report.status = 'dismissed'
-        message = "Скарга відхилена"
+        if action_type == 'dismiss':
+            report.status = 'dismissed'
+            message = "Скарга відхилена"
 
-        notification_title = "Your complaint was reviewed"
-        notification_description = (
-            "An admin reviewed your complaint, but no action was taken."
+            notification_title = "Your complaint was reviewed"
+            notification_description = (
+                "An admin reviewed your complaint, but no action was taken."
+            )
+
+        elif action_type == 'remove':
+            if report.content_object:
+                report.content_object.delete()
+
+            report.status = 'resolved'
+            message = "Контент видалено"
+
+            notification_title = "Your complaint was resolved"
+            notification_description = (
+                "An admin reviewed your complaint and removed the reported content."
+            )
+
+        elif action_type == 'warn':
+            report.status = 'resolved'
+            message = "Користувача попереджено"
+
+            notification_title = "Your complaint was resolved"
+            notification_description = (
+                "An admin reviewed your complaint and warned the reported user."
+            )
+
+        else:
+            return Response(
+                {"error": "Невідома дія"},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        report.handled_by = request.user
+        report.save()
+
+        # Create notification for the student who sent the complaint
+        Notification.objects.create(
+            user=report.reporter,
+            notification_type='system',
+            title=notification_title,
+            description=notification_description,
+            target_id=str(report.id)
         )
 
-    elif action_type == 'remove':
-        if report.content_object:
-            report.content_object.delete()
-
-        report.status = 'resolved'
-        message = "Контент видалено"
-
-        notification_title = "Your complaint was resolved"
-        notification_description = (
-            "An admin reviewed your complaint and removed the reported content."
-        )
-
-    elif action_type == 'warn':
-        report.status = 'resolved'
-        message = "Користувача попереджено"
-
-        notification_title = "Your complaint was resolved"
-        notification_description = (
-            "An admin reviewed your complaint and warned the reported user."
-        )
-
-    else:
-        return Response(
-            {"error": "Невідома дія"},
-            status=status.HTTP_400_BAD_REQUEST
-        )
-
-    report.handled_by = request.user
-    report.save()
-
-    # Create notification for the student who sent the complaint
-    Notification.objects.create(
-        user=report.reporter,
-        notification_type='system',
-        title=notification_title,
-        description=notification_description,
-        target_id=str(report.id)
-    )
-
-    return Response({"message": message})
+        return Response({"message": message})
     
 from rest_framework.views import APIView
 from rest_framework.response import Response
