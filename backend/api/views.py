@@ -610,6 +610,7 @@ class ReportViewSet(viewsets.ModelViewSet):
         report.handled_by = request.user
         report.save()
 
+    # Create notification for the student who sent the complaint
         # Create notification for the student who sent the complaint
         Notification.objects.create(
             user=report.reporter,

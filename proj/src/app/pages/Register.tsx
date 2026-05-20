@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom'; 
 import { UserCircle, ArrowLeft, Check, X, Loader2 } from 'lucide-react';
 import axios from 'axios';
-import { toast } from 'sonner'; // Додаємо нормальні нотифікації
+import { toast } from 'sonner';
 
 type UserRole = 'student' | 'admin' | 'doorkeeper';
 
@@ -36,11 +36,16 @@ export function Register() {
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
     const { name, value } = e.target;
     setFormData((prev) => ({ ...prev, [name]: value }));
-    if (errors[name]) setErrors((prev) => {
-      const newErrs = { ...prev };
-      delete newErrs[name];
-      return newErrs;
-    });
+    
+    // Якщо користувач почав змінювати поле, знімаємо з нього червоне підсвічування помилки
+    if (errors[name] || (name === 'email' && errors['username'])) {
+      setErrors((prev) => {
+        const newErrs = { ...prev };
+        delete newErrs[name];
+        delete newErrs['username']; // Також чистимо помилку юзернейму, бо вони пов'язані
+        return newErrs;
+      });
+    }
   };
 
   const validateForm = () => {
@@ -64,13 +69,13 @@ export function Register() {
     setLoading(true);
     try {
       const response = await axios.post('http://127.0.0.1:8000/api/register/', {
-        username: formData.email, // Django вимагає username
+        username: formData.email, 
         email: formData.email,
         password: formData.password,
-        full_name: formData.fullName, // snake_case для Django
+        full_name: formData.fullName,
         role: selectedRole,
         dormitory: formData.dormitory,
-        room_number: formData.roomNumber, // snake_case для Django
+        room_number: formData.roomNumber,
       });
 
       if (response.status === 201 || response.status === 200) {
@@ -78,15 +83,40 @@ export function Register() {
         navigate('/login');
       }
     } catch (error: any) {
-      console.error('Reg error:', error.response?.data);
-      // Якщо Django повертає помилку унікальності username/email
+      console.log('--- DJANGO ERROR BODY ---', JSON.stringify(error.response?.data, null, 2));
+      
       const serverErrors = error.response?.data;
-      if (serverErrors?.username || serverErrors?.email) {
-        toast.error("User with this email already exists");
+      const clientErrors: Record<string, string> = {};
+
+      if (serverErrors) {
+        // 1. Пряма перевірка твого кастомного ключа "error" від Django
+        if (serverErrors.error && typeof serverErrors.error === 'string') {
+          const rawError = serverErrors.error;
+          
+          // Якщо там написано про UNIQUE constraint для email
+          if (rawError.includes('api_user.email') || rawError.includes('UNIQUE constraint')) {
+            toast.error("User with this email already exists!");
+            clientErrors.email = "This email is already taken";
+          } else {
+            toast.error(rawError);
+          }
+        } else {
+          // 2. Стандартний сканер на випадок, якщо прилетять інші помилки (наприклад, по паролю)
+          Object.entries(serverErrors).forEach(([key, value]) => {
+            const rawMessage = Array.isArray(value) ? value[0] : value;
+            const msgString = String(rawMessage);
+            const targetKey = key === 'username' ? 'email' : key;
+            clientErrors[targetKey] = msgString;
+          });
+          
+          toast.error("Registration failed. Check details.");
+        }
+        
+        setErrors(clientErrors);
       } else {
-        toast.error("Registration failed. Check details.");
+        toast.error("Server connection lost. Try again later.");
+        setErrors({ general: "Server error" });
       }
-      setErrors(serverErrors || { general: "Server error" });
     } finally {
       setLoading(false);
     }
@@ -127,18 +157,25 @@ export function Register() {
             {/* Inputs */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div className="space-y-1">
-                <label className="text-sm font-medium text-gray-700">Full Name</label>
+                <div className="flex justify-between items-center">
+                  <label className="text-sm font-medium text-gray-700">Full Name</label>
+                  {errors.fullName && <span className="text-xs text-red-500 font-medium">{errors.fullName}</span>}
+                </div>
                 <input
                   name="fullName" type="text" value={formData.fullName} onChange={handleChange}
-                  className={`w-full p-3 border rounded-lg outline-none focus:ring-2 focus:ring-blue-500 ${errors.fullName ? 'border-red-500' : 'border-gray-300'}`}
+                  className={`w-full p-3 border rounded-lg outline-none focus:ring-2 focus:ring-blue-500 ${errors.fullName ? 'border-red-500 bg-red-50/30' : 'border-gray-300'}`}
                   placeholder="John Doe"
                 />
               </div>
+              
               <div className="space-y-1">
-                <label className="text-sm font-medium text-gray-700">Email</label>
+                <div className="flex justify-between items-center">
+                  <label className="text-sm font-medium text-gray-700">Email</label>
+                  {errors.email && <span className="text-xs text-red-500 font-medium">{errors.email}</span>}
+                </div>
                 <input
                   name="email" type="email" value={formData.email} onChange={handleChange}
-                  className={`w-full p-3 border rounded-lg outline-none focus:ring-2 focus:ring-blue-500 ${errors.email ? 'border-red-500' : 'border-gray-300'}`}
+                  className={`w-full p-3 border rounded-lg outline-none focus:ring-2 focus:ring-blue-500 ${errors.email ? 'border-red-500 bg-red-50/30' : 'border-gray-300'}`}
                   placeholder="name@university.edu"
                 />
               </div>
@@ -154,12 +191,16 @@ export function Register() {
                   {[1, 2, 3, 4, 5, 6, 7, 8].map(d => <option key={d} value={d}>Dormitory {d}</option>)}
                 </select>
               </div>
+              
               {selectedRole === 'student' && (
                 <div className="space-y-1">
-                  <label className="text-sm font-medium text-gray-700">Room Number</label>
+                  <div className="flex justify-between items-center">
+                    <label className="text-sm font-medium text-gray-700">Room Number</label>
+                    {errors.roomNumber && <span className="text-xs text-red-500 font-medium">{errors.roomNumber}</span>}
+                  </div>
                   <input
                     name="roomNumber" type="text" value={formData.roomNumber} onChange={handleChange}
-                    className={`w-full p-3 border rounded-lg outline-none focus:ring-2 focus:ring-blue-500 ${errors.roomNumber ? 'border-red-500' : 'border-gray-300'}`}
+                    className={`w-full p-3 border rounded-lg outline-none focus:ring-2 focus:ring-blue-500 ${errors.roomNumber ? 'border-red-500 bg-red-50/30' : 'border-gray-300'}`}
                     placeholder="101A"
                   />
                 </div>
@@ -169,17 +210,23 @@ export function Register() {
             {/* Passwords */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div className="space-y-1">
-                <label className="text-sm font-medium text-gray-700">Password</label>
+                <div className="flex justify-between items-center">
+                  <label className="text-sm font-medium text-gray-700">Password</label>
+                  {errors.password && <span className="text-xs text-red-500 font-medium">{errors.password}</span>}
+                </div>
                 <input
                   name="password" type="password" value={formData.password} onChange={handleChange}
-                  className={`w-full p-3 border rounded-lg outline-none focus:ring-2 focus:ring-blue-500 ${errors.password ? 'border-red-500' : 'border-gray-300'}`}
+                  className={`w-full p-3 border rounded-lg outline-none focus:ring-2 focus:ring-blue-500 ${errors.password ? 'border-red-500 bg-red-50/30' : 'border-gray-300'}`}
                 />
               </div>
               <div className="space-y-1">
-                <label className="text-sm font-medium text-gray-700">Confirm Password</label>
+                <div className="flex justify-between items-center">
+                  <label className="text-sm font-medium text-gray-700">Confirm Password</label>
+                  {errors.confirmPassword && <span className="text-xs text-red-500 font-medium">{errors.confirmPassword}</span>}
+                </div>
                 <input
                   name="confirmPassword" type="password" value={formData.confirmPassword} onChange={handleChange}
-                  className={`w-full p-3 border rounded-lg outline-none focus:ring-2 focus:ring-blue-500 ${errors.confirmPassword ? 'border-red-500' : 'border-gray-300'}`}
+                  className={`w-full p-3 border rounded-lg outline-none focus:ring-2 focus:ring-blue-500 ${errors.confirmPassword ? 'border-red-500 bg-red-50/30' : 'border-gray-300'}`}
                 />
               </div>
             </div>
