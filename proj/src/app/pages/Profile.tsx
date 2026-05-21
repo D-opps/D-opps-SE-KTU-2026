@@ -23,6 +23,10 @@ export function Profile() {
 
   const dormitories = ['1', '2', '3', '4', '5', '6', '7', '8'];
 
+  // Перевірка, чи є користувач адміном або доркіпером
+  const userRole = profileData?.role?.toLowerCase() || 'student';
+  const isStaff = userRole === 'admin' || userRole === 'doorkeeper';
+
   const getPhotoUrl = (photoPath: string | null) => {
     if (!photoPath) return `https://ui-avatars.com/api/?name=${profileData?.first_name || 'User'}&background=0D8ABC&color=fff`;
     if (photoPath.startsWith('http')) return photoPath;
@@ -60,8 +64,12 @@ export function Profile() {
     const token = localStorage.getItem('accessToken');
     const formData = new FormData();
     formData.append('first_name', editForm.name);
-    formData.append('room_number', editForm.room);
     formData.append('dormitory', editForm.dormitory);
+    
+    // Відправляємо номер кімнати тільки якщо користувач НЕ є адміном/доркіпером
+    if (!isStaff) {
+      formData.append('room_number', editForm.room);
+    }
     
     if (fileInputRef.current?.files?.[0]) {
       formData.append('photo', fileInputRef.current.files[0]);
@@ -99,7 +107,6 @@ export function Profile() {
       });
 
       toast.success("Listing deleted!");
-      // Видаляємо товар зі стейту, щоб він зник з екрану
       setMyProducts(prev => prev.filter(item => item.id !== id));
     } catch (err) {
       toast.error("Failed to delete product");
@@ -151,13 +158,17 @@ export function Profile() {
                   <p className="text-sm font-medium">#{profileData?.dormitory || '—'}</p>
                 </div>
               </div>
-              <div className="flex items-center gap-4 text-gray-600">
-                <MapPin size={18} className="text-gray-400" />
-                <div>
-                  <p className="text-[10px] uppercase font-bold text-gray-400">Room</p>
-                  <p className="text-sm font-medium">{profileData?.room_number || '—'}</p>
+              
+              {/* Показуємо кімнату в картці тільки якщо це не Адмін і не Доркіпер */}
+              {!isStaff && (
+                <div className="flex items-center gap-4 text-gray-600">
+                  <MapPin size={18} className="text-gray-400" />
+                  <div>
+                    <p className="text-[10px] uppercase font-bold text-gray-400">Room</p>
+                    <p className="text-sm font-medium">{profileData?.room_number || '—'}</p>
+                  </div>
                 </div>
-              </div>
+              )}
             </div>
 
             <button onClick={() => setIsEditModalOpen(true)} className="w-full mt-8 px-4 py-3 bg-gray-900 text-white rounded-2xl font-semibold hover:bg-black transition-all shadow-lg active:scale-95">
@@ -181,8 +192,6 @@ export function Profile() {
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 {myProducts.map((item: any) => (
                   <div key={item.id} className="group bg-white border border-gray-100 rounded-2xl overflow-hidden shadow-sm hover:shadow-md transition-all relative">
-                    
-                    {/* Кнопка видалення */}
                     <button 
                       onClick={(e) => handleDeleteProduct(e, item.id)}
                       className="absolute top-3 right-3 z-10 p-2.5 bg-white/90 backdrop-blur-sm text-red-500 rounded-xl opacity-0 group-hover:opacity-100 transition-all hover:bg-red-500 hover:text-white shadow-sm"
@@ -218,7 +227,6 @@ export function Profile() {
         </div>
       </div>
 
-      {/* Модалка редагування */}
       {isEditModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm">
           <div className="bg-white w-full max-w-md rounded-[2.5rem] p-8 relative shadow-2xl animate-in fade-in zoom-in duration-200">
@@ -241,17 +249,22 @@ export function Profile() {
                 <input type="text" value={editForm.name} onChange={(e) => setEditForm({...editForm, name: e.target.value})} className="w-full px-5 py-3 bg-gray-50 rounded-xl outline-none focus:ring-2 focus:ring-blue-500 transition-all" />
               </div>
 
-              <div className="grid grid-cols-2 gap-4">
+              {/* Умовна структура сітки залежно від ролі */}
+              <div className={isStaff ? "block" : "grid grid-cols-2 gap-4"}>
                 <div>
                   <label className="text-xs font-bold text-gray-400 uppercase ml-1">Dorm</label>
                   <select value={editForm.dormitory} onChange={(e) => setEditForm({...editForm, dormitory: e.target.value})} className="w-full px-5 py-3 bg-gray-50 rounded-xl outline-none focus:ring-2 focus:ring-blue-500 transition-all">
                     {dormitories.map(d => <option key={d} value={d}>Dorm {d}</option>)}
                   </select>
                 </div>
-                <div>
-                  <label className="text-xs font-bold text-gray-400 uppercase ml-1">Room</label>
-                  <input type="text" value={editForm.room} onChange={(e) => setEditForm({...editForm, room: e.target.value})} className="w-full px-5 py-3 bg-gray-50 rounded-xl outline-none focus:ring-2 focus:ring-blue-500 transition-all" />
-                </div>
+                
+                {/* Інпут кімнати рендериться лише якщо користувач СТУДЕНТ */}
+                {!isStaff && (
+                  <div>
+                    <label className="text-xs font-bold text-gray-400 uppercase ml-1">Room</label>
+                    <input type="text" value={editForm.room} onChange={(e) => setEditForm({...editForm, room: e.target.value})} className="w-full px-5 py-3 bg-gray-50 rounded-xl outline-none focus:ring-2 focus:ring-blue-500 transition-all" />
+                  </div>
+                )}
               </div>
 
               <button type="submit" disabled={updating} className="w-full bg-blue-600 text-white py-4 rounded-2xl font-bold hover:bg-blue-700 transition-all flex justify-center items-center gap-2 shadow-lg shadow-blue-200 active:scale-95 disabled:opacity-50">

@@ -3,7 +3,7 @@ import { useParams, useNavigate } from 'react-router-dom';
 import {
   Send, ArrowLeft, Loader2,
   Globe, Building2, Trash2, Search, Bell,
-  MoreVertical, UserPlus, MessageSquare, CheckCheck, User, Pin, PinOff
+  MoreVertical, UserPlus, MessageSquare, CheckCheck, User, Pin, PinOff, Clock
 } from 'lucide-react'; 
 import axios from 'axios';
 import { toast } from 'sonner';
@@ -73,17 +73,61 @@ export function Chat() {
     } catch (e) { toast.error("Помилка видалення"); }
   };
 
+  // Оновлена функція відправки повідомлень (Оптимістичний та швидкий UI)
   const sendMessage = async (e: any) => {
     e.preventDefault();
-    if (!newMessage.trim()) return;
+    const messageText = newMessage.trim();
+    if (!messageText || !chatId) return;
+
+    // 1. МИТТЄВО очищаємо інпут, щоб юзер не чекав відповіді сервера
+    setNewMessage('');
+
+    // 2. Створюємо тимчасове оптимістичне повідомлення для миттєвого рендеру
+    const temporaryId = Date.now(); // Тимчасовий id для списку
+    const optMessage = {
+      id: temporaryId,
+      sender: userId,
+      sender_name: "Me",
+      text: messageText,
+      created_at: new Date().toISOString(),
+      isSending: true // прапорець для відображення статусу
+    };
+
+    // 3. Локально оновлюємо стейт поточного чату, щоб повідомлення з'явилося одразу
+    setCurrentChat((prev: any) => {
+      if (!prev) return prev;
+      return {
+        ...prev,
+        messages: prev.messages ? [...prev.messages, optMessage] : [optMessage]
+      };
+    });
+
     try {
+      // 4. Відправляємо реальний запит на сервер паралельно у фоні
       await axios.post(`${BASE_URL}/api/messages/`, {
-        conversation: chatId, text: newMessage
+        conversation: chatId, text: messageText
       }, { headers: { Authorization: `Bearer ${token}` } });
-      setNewMessage('');
+      
+      // 5. Синхронізуємо дані з сервером після успішної відправки
       fetchChat();
       fetchConversations();
-    } catch (e) { toast.error("Помилка відправки"); }
+    } catch (e) { 
+      toast.error("Помилка відправки");
+      // Якщо сервер відвалився — видаляємо тимчасове повідомлення і повертаємо текст назад в інпут
+      setNewMessage(messageText);
+      setCurrentChat((prev: any) => {
+        if (!prev || !prev.messages) return prev;
+        return {
+          ...prev,
+          messages: prev.messages.filter((m: any) => m.id !== temporaryId)
+        };
+      });
+    }
+  };
+
+  // Обробник натискання на дзвіночок сповіщень
+  const handleBellClick = () => {
+    navigate('/notifications'); // Перенаправляє на сторінку сповіщень, яку ми лагодили
   };
 
   useEffect(() => {
@@ -117,7 +161,12 @@ export function Chat() {
         
         <div className="p-5 border-b border-gray-50 flex justify-between items-center">
           <h1 className="text-xl font-black text-blue-600 tracking-tighter italic">MESSAGES</h1>
-          <Bell className="text-gray-400 cursor-pointer hover:text-blue-500 transition-colors" size={20} />
+          {/* Активний працюючий дзвіночок */}
+          <Bell 
+            onClick={handleBellClick} 
+            className="text-gray-400 cursor-pointer hover:text-blue-500 transition-colors active:scale-90" 
+            size={20} 
+          />
         </div>
 
         {/* ПОШУК */}
@@ -207,9 +256,8 @@ export function Chat() {
                   <p className="text-[11px] text-gray-400 truncate">Last message...</p>
                 </div>
 
-                {/* БЛОК КНОПОК (Завжди видимий) */}
+                {/* БЛОК КНОПОК */}
                 <div className="absolute right-2 flex items-center gap-1 bg-inherit">
-                  {/* Кнопка закріплення */}
                   <button
                     onClick={(e) => togglePin(e, c.id)}
                     className={`p-2 rounded-lg transition-colors ${
@@ -219,7 +267,6 @@ export function Chat() {
                     {isPinned ? <PinOff size={16} fill="currentColor" /> : <Pin size={16} />}
                   </button>
                   
-                  {/* Кнопка видалення */}
                   <button
                     onClick={(e) => deleteChat(e, c.id)}
                     className="p-2 text-red-300 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
@@ -279,8 +326,16 @@ export function Chat() {
                       {!isMe && <p className="text-[9px] font-black text-purple-500 uppercase mb-1">{m.sender_name}</p>}
                       <p className="text-sm">{m.text}</p>
                       <div className={`flex items-center gap-1 mt-1 opacity-50 ${isMe ? 'justify-end' : 'justify-start'}`}>
-                         <span className="text-[8px] font-bold">{new Date().toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'})}</span>
-                         {isMe && <CheckCheck size={10} />}
+                         <span className="text-[8px] font-bold">
+                           {new Date(m.created_at).toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'})}
+                         </span>
+                         {isMe && (
+                           m.isSending ? (
+                             <Clock size={10} className="animate-pulse" /> // Годинник під час відправки
+                           ) : (
+                             <CheckCheck size={10} /> // Пташечки, коли збережено
+                           )
+                         )}
                       </div>
                     </div>
                   </div>

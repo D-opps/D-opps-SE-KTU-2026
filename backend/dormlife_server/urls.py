@@ -45,6 +45,7 @@ urlpatterns = [
         path('users/me/', views.get_me),
         path('users/search/', views.search_user_by_email),
         path('api/reports/create/', CreateReportView.as_view(), name='report-create'),
+
        ])),
     
     path('api-auth/', include('rest_framework.urls')),
