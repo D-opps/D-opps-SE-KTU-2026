@@ -1,9 +1,9 @@
 import { Link } from 'react-router-dom';
 import { 
-  WashingMachine, ShoppingBag, MessageSquare, Users, 
+  WashingMachine, ShoppingBag, Users, 
   MessageCircle, Calendar, MessageSquare as ChatIcon, TrendingUp, Loader2, Zap
 } from 'lucide-react';
-import { useState, useEffect } from 'react';
+import { useState, useEffect, ReactNode } from 'react';
 
 // --- Interfaces ---
 interface Metrics {
@@ -27,6 +27,24 @@ interface ChatMessage {
   sender_name: string;
   text: string;
   timestamp: string;
+}
+
+interface MetricCardProps {
+  title: string;
+  value: number;
+  sub: number;
+  label: string;
+  icon: ReactNode;
+  color: 'blue' | 'purple' | 'green' | 'pink';
+}
+
+interface DashboardCardProps {
+  to: string;
+  title: string;
+  value: string;
+  desc: string;
+  icon: ReactNode;
+  color: string;
 }
 
 export function Dashboard() {
@@ -63,12 +81,15 @@ export function Dashboard() {
 
       if (metricsRes.ok) {
         const rawMetrics = await metricsRes.json();
-        // Мапимо змінні з Django під твій React-інтерфейс
+        // Мапимо змінні з Django під твій React-інтерфейс + додаємо дефолтні 0
         setMetrics({
           totalUsers: rawMetrics.total_users || 0,
           verifiedUsers: rawMetrics.signups_today || 0,
-          totalMessages: rawMetrics.active_chats_today || 0,
+          
+          // Використовуємо загальну к-сть якщо вона є, або дублюємо активність за сьогодні
+          totalMessages: rawMetrics.total_chats_events || rawMetrics.active_chats_today || 0,
           recentMessages: rawMetrics.active_chats_today || 0,
+          
           totalListings: rawMetrics.total_listings || 0,
           activeListings: rawMetrics.listings_today || 0,
           totalEvents: rawMetrics.total_events || 0,
@@ -108,7 +129,7 @@ export function Dashboard() {
     );
   }
 
-  // Обчислення кількості вільних машинок (знаходиться точно перед головним return)
+  // Обчислення кількості вільних машинок
   const availableMachinesCount = machines.filter((m) => m.status === 'free').length;
 
   return (
@@ -136,7 +157,7 @@ export function Dashboard() {
             <select
               value={metricsPeriod}
               onChange={(e) => setMetricsPeriod(Number(e.target.value))}
-              className="bg-white border-none shadow-sm rounded-xl px-4 py-2 font-bold text-sm"
+              className="bg-white border-none shadow-sm rounded-xl px-4 py-2 font-bold text-sm cursor-pointer focus:ring-2 focus:ring-blue-500"
             >
               <option value={7}>Last 7 Days</option>
               <option value={30}>Last Month</option>
@@ -145,10 +166,30 @@ export function Dashboard() {
           
           {metrics && (
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
-              <MetricCard title="Total Users" value={metrics.totalUsers} sub={metrics.verifiedUsers} label="Verified" icon={<Users />} color="blue" />
-              <MetricCard title="Chat Activity" value={metrics.totalMessages} sub={metrics.recentMessages} label="New" icon={<MessageCircle />} color="purple" />
-              <MetricCard title="Marketplace" value={metrics.totalListings} sub={metrics.activeListings} label="Active" icon={<ShoppingBag />} color="green" />
-              <MetricCard title="Events" value={metrics.totalEvents} sub={metrics.recentEvents} label="Upcoming" icon={<Calendar />} color="pink" />
+              <MetricCard 
+                title="Total Users" 
+                value={metrics.totalUsers} 
+                sub={metrics.verifiedUsers} 
+                label="Verified" 
+                icon={<Users />} 
+                color="blue" 
+              />
+              <MetricCard 
+                title="Chat Activity" 
+                value={metrics.totalMessages} 
+                sub={metrics.recentMessages} 
+                label="New" 
+                icon={<MessageCircle />} 
+                color="purple" 
+              />
+              <MetricCard 
+                title="Marketplace" 
+                value={metrics.totalListings} 
+                sub={metrics.activeListings} 
+                label="Active" 
+                icon={<ShoppingBag />} 
+                color="green" 
+              />
             </div>
           )}
         </section>
@@ -185,17 +226,18 @@ export function Dashboard() {
 }
 
 // --- Компоненти-помічники для карток метрик та навігації ---
-function MetricCard({ title, value, sub, label, icon, color }: any) {
-  const colors: any = {
+function MetricCard({ title, value, sub, label, icon, color }: MetricCardProps) {
+  const colors = {
     blue: "text-blue-600 bg-blue-50",
     purple: "text-purple-600 bg-purple-50",
     green: "text-green-600 bg-green-50",
     pink: "text-pink-600 bg-pink-50"
   };
+
   return (
     <div className="bg-white rounded-3xl p-6 shadow-sm border border-gray-100">
       <div className="flex items-center justify-between mb-4">
-        <div className={`p-3 rounded-2xl ${colors[color]}`}>{icon}</div>
+        <div className={`p-3 rounded-2xl ${colors[color] || colors.blue}`}>{icon}</div>
         <span className="text-[10px] font-black uppercase text-gray-400">{title}</span>
       </div>
       <p className="text-3xl font-black text-gray-900 mb-1">{value}</p>
@@ -207,7 +249,7 @@ function MetricCard({ title, value, sub, label, icon, color }: any) {
   );
 }
 
-function DashboardCard({ to, title, value, desc, icon, color }: any) {
+function DashboardCard({ to, title, value, desc, icon, color }: DashboardCardProps) {
   return (
     <Link to={to} className="group bg-white rounded-3xl p-8 shadow-sm border border-gray-100 hover:border-blue-200 transition-all hover:shadow-lg">
       <div className={`w-14 h-14 rounded-2xl flex items-center justify-center mb-6 group-hover:scale-110 transition-transform ${color}`}>

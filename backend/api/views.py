@@ -481,14 +481,24 @@ class EventViewSet(viewsets.ModelViewSet):
 
     def get_queryset(self):
         return Event.objects.all().order_by('-date')
+
     def perform_create(self, serializer):
         serializer.save(
             creator=self.request.user,
             dormitory=self.request.user.dormitory
         )
 
+    # 🔥 OLD (leave for backward compatibility)
     @action(detail=True, methods=['post'])
     def rsvp(self, request, pk=None):
+        return self._toggle_attendance(request, pk)
+
+    # 🔥 NEW CLEAN NAME
+    @action(detail=True, methods=['post'])
+    def toggle_attendance(self, request, pk=None):
+        return self._toggle_attendance(request, pk)
+
+    def _toggle_attendance(self, request, pk):
         event = self.get_object()
         user = request.user
 
@@ -504,7 +514,6 @@ class EventViewSet(viewsets.ModelViewSet):
             "attending": attending,
             "event": EventSerializer(event).data
         })
-
 class NotificationViewSet(viewsets.ModelViewSet):
     serializer_class = NotificationSerializer
     permission_classes = [permissions.IsAuthenticated]
@@ -557,8 +566,49 @@ class CreateReportView(generics.CreateAPIView):
     permission_classes = [permissions.IsAuthenticated]
 
     def perform_create(self, serializer):
-        serializer.save(reporter=self.request.user)
 
+        content_type_id = self.request.data.get("content_type")
+        object_id = self.request.data.get("object_id")
+
+        reported_user = None
+
+        if content_type_id and object_id:
+            from django.contrib.contenttypes.models import ContentType
+
+            ct = ContentType.objects.get(id=content_type_id)
+            model = ct.model_class()
+            obj = model.objects.get(id=object_id)
+
+            if hasattr(obj, "seller"):
+                reported_user = obj.seller
+            elif hasattr(obj, "sender"):
+                reported_user = obj.sender
+            elif hasattr(obj, "user"):
+                reported_user = obj.user
+
+        report = serializer.save(
+            reporter=self.request.user,
+            reported_user=reported_user
+        )
+
+        # 🔥 NOTIFY ADMINS HERE
+        admins = User.objects.filter(role__in=["admin", "doorkeeper"])
+
+        for admin in admins:
+            Notification.objects.create(
+                user=admin,
+                notification_type="system",
+                title="New report submitted",
+                description=f"New report from {self.request.user.email}",
+                target_id=str(report.id)
+            )
+        print("REPORT:", report.id)
+        print("REPORTED USER:", report.reported_user)
+        print("CONTENT OBJECT:", report.content_object)
+
+
+from django.utils import timezone
+from .models import Notification
 # 2. Універсальний в'юсет (об'єднали два дублікати в один)
 class ReportViewSet(viewsets.ModelViewSet):
     queryset = Report.objects.all()
@@ -571,57 +621,74 @@ class ReportViewSet(viewsets.ModelViewSet):
         report = self.get_object()
         action_type = request.data.get('action')
 
+        obj = report.content_object  # 🔥 ОЦЕ НАДІЙНО
+
+        reported_user = None
+
+        if obj:
+            if hasattr(obj, "seller"):
+                reported_user = obj.seller
+            elif hasattr(obj, "sender"):
+                reported_user = obj.sender
+            elif hasattr(obj, "user"):
+                reported_user = obj.user
+
         if action_type == 'dismiss':
             report.status = 'dismissed'
-            message = "Скарга відхилена"
 
-            notification_title = "Your complaint was reviewed"
-            notification_description = (
-                "An admin reviewed your complaint, but no action was taken."
+            Notification.objects.create(
+                user=report.reporter,
+                notification_type='system',
+                title='Your report was reviewed',
+                description='Admin reviewed your report. No action was taken.',
             )
 
         elif action_type == 'remove':
-            if report.content_object:
-                report.content_object.delete()
+            if obj:
+                obj.delete()
 
             report.status = 'resolved'
-            message = "Контент видалено"
 
-            notification_title = "Your complaint was resolved"
-            notification_description = (
-                "An admin reviewed your complaint and removed the reported content."
+            Notification.objects.create(
+                user=report.reporter,
+                notification_type='system',
+                title='Report resolved',
+                description='Reported content was removed.',
             )
+
+            if reported_user:
+                Notification.objects.create(
+                    user=reported_user,
+                    notification_type='system',
+                    title='Content violation',
+                    description='Your content was removed after a report.',
+                )
 
         elif action_type == 'warn':
             report.status = 'resolved'
-            message = "Користувача попереджено"
 
-            notification_title = "Your complaint was resolved"
-            notification_description = (
-                "An admin reviewed your complaint and warned the reported user."
+            Notification.objects.create(
+                user=report.reporter,
+                notification_type='system',
+                title='Report resolved',
+                description='User has been warned.',
             )
+
+            if reported_user:
+                Notification.objects.create(
+                    user=reported_user,
+                    notification_type='system',
+                    title='Warning',
+                    description='You received a warning due to a report.',
+                )
 
         else:
-            return Response(
-                {"error": "Невідома дія"},
-                status=status.HTTP_400_BAD_REQUEST
-            )
+            return Response({"error": "Unknown action"}, status=400)
 
         report.handled_by = request.user
         report.save()
 
-    # Create notification for the student who sent the complaint
-        # Create notification for the student who sent the complaint
-        Notification.objects.create(
-            user=report.reporter,
-            notification_type='system',
-            title=notification_title,
-            description=notification_description,
-            target_id=str(report.id)
-        )
-
-        return Response({"message": message})
-    
+        return Response({"message": "Action completed"})    
 from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework.permissions import IsAdminUser
@@ -629,19 +696,105 @@ from .models import AnalyticsEvent, Product, User
 from django.utils import timezone
 from datetime import timedelta
 
+from rest_framework.views import APIView
+from rest_framework.response import Response
+from rest_framework.permissions import IsAuthenticated
+from django.utils import timezone
+
+# Імпортуємо всі моделі з твого проекту (перевір правильність імпорту під свою структуру папок)
+from .models import User, Product, Machine, Conversation, Message, Report, Notification
+
+from rest_framework.views import APIView
+from rest_framework.response import Response
+from rest_framework.permissions import IsAuthenticated
+from django.utils import timezone
+from django.db.models import Q
+
+# Імпортуємо ваші моделі
+from .models import User, Product, Machine, Conversation, Message, Report, Notification
+
 class DashboardMetricsView(APIView):
-    permission_classes = [IsAuthenticated] # Only PO/Admins see this
+    permission_classes = [IsAuthenticated] # Переконуємось, що юзер авторизований
 
     def get(self, request):
         today = timezone.now().date()
         
+        # 1. Отримуємо поточного адміна та його гуртожиток
+        current_admin = request.user
+        admin_dorm = getattr(current_admin, 'dormitory', None)
+        
+        # Якщо у адміна чомусь не вказано гуртожиток, можна або повернути помилку, 
+        # або рахувати по всій системі. Зробимо базовий фільтр:
+        if not admin_dorm:
+            return Response({"error": "Admin has no assigned dormitory."}, status=400)
+
+        # 2. ФІЛЬТРУЄМО КОРИСТУВАЧІВ (тільки з гуртожитку цього адміна)
+        users_in_dorm = User.objects.filter(dormitory=admin_dorm)
+        total_users = users_in_dorm.count()
+        signups_today = users_in_dorm.filter(date_joined__date=today).count()
+
+        # 3. ФІЛЬТРУЄМО ПРАЛЬНІ МАШИНИ
+        # УВАГА: Перевірте у вашій моделі Machine, як вона пов'язана з гуртожитком.
+        # Якщо у моделі Machine є поле 'dormitory', то фільтр буде такий:
+        try:
+            dorm_machines = Machine.objects.filter(dormitory=admin_dorm)
+        except Exception:
+            # Якщо поля 'dormitory' в Machine немає, але є, наприклад, 'dormitory_number' (як у Conversation):
+            try:
+                dorm_machines = Machine.objects.filter(dormitory_number=admin_dorm)
+            except Exception:
+                # Якщо зв'язку взагалі немає, поки що беремо всі машинки (тимчасовий захист від помилки)
+                dorm_machines = Machine.objects.all()
+
+        total_machines = dorm_machines.count()
+        free_machines = dorm_machines.filter(status='free').count()
+
+        # 4. ФІЛЬТРУЄМО ЧАТИ ТА ПОВІДОМЛЕННЯ
+        # В admin.py для Conversation було вказано поле 'dormitory_number'. Використовуємо його:
+        try:
+            dorm_conversations = Conversation.objects.filter(dormitory_number=admin_dorm)
+        except Exception:
+            # На випадок, якщо поле називається просто 'dormitory'
+            dorm_conversations = Conversation.objects.filter(dormitory=admin_dorm)
+
+        total_conversations = dorm_conversations.count()
+        
+        # Рахуємо повідомлення за сьогодні, які належать ТІЛЬКИ чатам цього гуртожитку
+        messages_today = Message.objects.filter(
+            conversation__in=dorm_conversations, 
+            created_at__date=today
+        ).count()
+
+        # 5. ФІЛЬТРУЄМО МАРКЕТПЛЕЙС (Товари, які продають студенти з цього гуртожитку)
+        # Продукт пов'язаний з продавцем (seller), а продавець — це User, у якого є гуртожиток
+        dorm_products = Product.objects.filter(seller__dormitory=admin_dorm)
+        total_listings = dorm_products.count()
+        listings_today = dorm_products.filter(created_at__date=today).count()
+
+        # 6. ФІЛЬТРУЄМО СКАРГИ (Скарги, які подали студенти цього гуртожитку)
+        pending_reports = Report.objects.filter(reporter__dormitory=admin_dorm, status='pending').count()
+
+        # 7. ФІЛЬТРУЄМО СПОВІЩЕННЯ (Надіслані студентам цього гуртожитку)
+        total_notifications = Notification.objects.filter(user__dormitory=admin_dorm).count()
+
+        # Віддаємо відфільтровані дані на фронтенд
         data = {
-            "total_users": User.objects.count(),
-            "total_listings": Product.objects.count(),
-            "signups_today": AnalyticsEvent.objects.filter(event_type='signup', created_at__date=today).count(),
-            "listings_today": AnalyticsEvent.objects.filter(event_type='listing_created', created_at__date=today).count(),
-            "active_chats_today": AnalyticsEvent.objects.filter(event_type='chat_session', created_at__date=today).count(),
+            "total_users": total_users,
+            "signups_today": signups_today,
+            "total_listings": total_listings,
+            "listings_today": listings_today,
+            
+            "total_conversations": total_conversations,
+            "messages_today": messages_today,
+            "active_chats_today": messages_today,
+            
+            "total_machines": total_machines,
+            "free_machines": free_machines,
+            
+            "pending_reports": pending_reports,
+            "total_notifications": total_notifications
         }
+        
         return Response(data)
     
 from rest_framework.decorators import api_view, permission_classes

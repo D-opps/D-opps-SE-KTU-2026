@@ -21,6 +21,34 @@ export function Notifications() {
   const [statusFilter, setStatusFilter] = useState<'all' | 'unread'>('all');
   const [typeFilter, setTypeFilter] = useState<string>('all');
 
+  // Функція для безпечного відображення часу сповіщення
+const formatTime = (dateString: string | null | undefined) => {
+  if (!dateString) return '—';
+
+  const parsedDate = new Date(dateString);
+  if (isNaN(parsedDate.getTime())) return '—';
+
+  const now = new Date();
+  const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  const yesterday = new Date(today);
+  yesterday.setDate(yesterday.getDate() - 1);
+
+  const itemDate = new Date(parsedDate.getFullYear(), parsedDate.getMonth(), parsedDate.getDate());
+  
+  // Форматуємо час: "23:30"
+  const timeStr = parsedDate.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: false });
+
+  // Логіка перевірки Сьогодні / Вчора англійською
+  if (itemDate.getTime() === today.getTime()) {
+    return `Today, ${timeStr}`;
+  } else if (itemDate.getTime() === yesterday.getTime()) {
+    return `Yesterday, ${timeStr}`;
+  } else {
+    // Для старіших дат виведе: "May 21, 23:30"
+    const dateStr = parsedDate.toLocaleDateString('en-US', { day: 'numeric', month: 'short' });
+    return `${dateStr}, ${timeStr}`;
+  }
+};
   // Завантаження сповіщень з сервера
   const loadNotifications = async () => {
     setLoading(true); 
@@ -224,7 +252,7 @@ export function Notifications() {
                 <div className="flex justify-between items-start">
                   <h3 className={`font-semibold ${!n.is_read ? 'text-gray-900' : 'text-gray-600'}`}>{n.title}</h3>
                   <span className="text-[10px] text-gray-400 font-medium">
-                    {new Date(n.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                    {formatTime(n.created_at)}
                   </span>
                 </div>
                 <p className="text-sm text-gray-500 mt-1">{n.description}</p>

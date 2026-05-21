@@ -102,11 +102,11 @@ class MessageSerializer(serializers.ModelSerializer):
     sender_name = serializers.ReadOnlyField(source='sender.first_name')
     # Додаємо read_only=True для sender
     sender = serializers.PrimaryKeyRelatedField(read_only=True) 
-    timestamp = serializers.DateTimeField(source='created_at', format="%H:%M", read_only=True)
+    created_at = serializers.DateTimeField(read_only=True)
 
     class Meta:
         model = Message
-        fields = ['id', 'conversation', 'sender', 'sender_name', 'text', 'is_read', 'timestamp']
+        fields = ['id', 'conversation', 'sender', 'sender_name', 'text', 'is_read', 'created_at']
 class ConversationSerializer(serializers.ModelSerializer):
     
     messages = MessageSerializer(many=True, read_only=True)
@@ -188,7 +188,11 @@ from .models import Event
 
 class EventSerializer(serializers.ModelSerializer):
     creatorName = serializers.CharField(source='creator.first_name', read_only=True)
+
     attendees = serializers.SerializerMethodField()
+
+    # 🔥 FIX: allow empty description
+    description = serializers.CharField(required=False, allow_blank=True, allow_null=True)
 
     class Meta:
         model = Event
@@ -197,6 +201,7 @@ class EventSerializer(serializers.ModelSerializer):
             'title',
             'description',
             'date',
+            'end_date',   # 🔥 NEW
             'location',
             'dormitory',
             'creator',
@@ -217,8 +222,7 @@ class EventSerializer(serializers.ModelSerializer):
 
 
 class NotificationSerializer(serializers.ModelSerializer):
-    created_at = serializers.DateTimeField(format="%d.%m %H:%M", read_only=True)
-
+    created_at = serializers.DateTimeField(read_only=True)
     class Meta:
         model = Notification
         fields = [

@@ -177,10 +177,10 @@ class Favorite(models.Model):
         unique_together = ('user', 'product')
 class Event(models.Model):
     title = models.CharField(max_length=200)
-    description = models.TextField()
     date = models.DateTimeField()
     location = models.CharField(max_length=255)
-
+    description = models.TextField(blank=True, null=True)
+    end_date = models.DateTimeField(null=True, blank=True)
     dormitory = models.IntegerField()
 
     creator = models.ForeignKey(
@@ -241,9 +241,16 @@ class Report(models.Model):
         ('fraud', 'Fraud/Scam'),
         ('other', 'Other'),
     )
+    
 
     reporter = models.ForeignKey(User, on_delete=models.CASCADE, related_name='reports_made')
-    
+    reported_user = models.ForeignKey(
+    User,
+    on_delete=models.CASCADE,
+    related_name='reports_received',
+    null=True,
+    blank=True
+    )
     # Generic Foreign Key дозволяє посилатися на Product або Message
     # Змініть це поле в моделі Report:
     content_type = models.ForeignKey(ContentType, on_delete=models.CASCADE, null=True, blank=True)
