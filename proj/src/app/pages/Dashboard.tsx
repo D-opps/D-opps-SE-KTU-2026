@@ -8,13 +8,8 @@ import { useState, useEffect, ReactNode } from 'react';
 // --- Interfaces ---
 interface Metrics {
   totalUsers: number;
-  verifiedUsers: number;
-  totalMessages: number;
-  recentMessages: number;
   totalListings: number;
-  activeListings: number;
-  totalEvents: number;
-  recentEvents: number;
+  totalNotifications: number
 }
 
 interface Machine {
@@ -81,19 +76,11 @@ export function Dashboard() {
 
       if (metricsRes.ok) {
         const rawMetrics = await metricsRes.json();
-        // Мапимо змінні з Django під твій React-інтерфейс + додаємо дефолтні 0
+
         setMetrics({
           totalUsers: rawMetrics.total_users || 0,
-          verifiedUsers: rawMetrics.signups_today || 0,
-          
-          // Використовуємо загальну к-сть якщо вона є, або дублюємо активність за сьогодні
-          totalMessages: rawMetrics.total_chats_events || rawMetrics.active_chats_today || 0,
-          recentMessages: rawMetrics.active_chats_today || 0,
-          
           totalListings: rawMetrics.total_listings || 0,
-          activeListings: rawMetrics.listings_today || 0,
-          totalEvents: rawMetrics.total_events || 0,
-          recentEvents: rawMetrics.events_today || 0
+          totalNotifications: rawMetrics.total_notifications || 0,
         });
       }
 
@@ -169,23 +156,23 @@ export function Dashboard() {
               <MetricCard 
                 title="Total Users" 
                 value={metrics.totalUsers} 
-                sub={metrics.verifiedUsers} 
-                label="Verified" 
+                sub={0} 
+                label="Registered" 
                 icon={<Users />} 
                 color="blue" 
               />
               <MetricCard 
-                title="Chat Activity" 
-                value={metrics.totalMessages} 
-                sub={metrics.recentMessages} 
-                label="New" 
+                title="Notifications" 
+                value={metrics.totalNotifications} 
+                sub={0} 
+                label="System alerts" 
                 icon={<MessageCircle />} 
                 color="purple" 
               />
               <MetricCard 
                 title="Marketplace" 
                 value={metrics.totalListings} 
-                sub={metrics.activeListings} 
+                sub={0} 
                 label="Active" 
                 icon={<ShoppingBag />} 
                 color="green" 

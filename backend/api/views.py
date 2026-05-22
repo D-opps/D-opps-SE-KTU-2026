@@ -768,8 +768,8 @@ class DashboardMetricsView(APIView):
         # 5. ФІЛЬТРУЄМО МАРКЕТПЛЕЙС (Товари, які продають студенти з цього гуртожитку)
         # Продукт пов'язаний з продавцем (seller), а продавець — це User, у якого є гуртожиток
         dorm_products = Product.objects.filter(seller__dormitory=admin_dorm)
-        total_listings = dorm_products.count()
-        listings_today = dorm_products.filter(created_at__date=today).count()
+        total_listings = Product.objects.count()
+        listings_today = Product.objects.filter(created_at__date=today).count()
 
         # 6. ФІЛЬТРУЄМО СКАРГИ (Скарги, які подали студенти цього гуртожитку)
         pending_reports = Report.objects.filter(reporter__dormitory=admin_dorm, status='pending').count()

@@ -25,26 +25,24 @@ urlpatterns = [
     
     path('api/', include([
         path('', include(router.urls)),
-        path('reports/create/', CreateReportView.as_view(), name='report-create'),
-        path('analytics/track/', track_event_manual, name='track-event'),
+
         path('admin/metrics/', DashboardMetricsView.as_view(), name='admin-metrics'),
-        path('admin/analytics/', DashboardMetricsView.as_view(), name='admin-analytics'), # Теж саме, що й метрики
-        # Спеціальні ендпоінти
+        path('analytics/track/', track_event_manual),
+
         path('recent_messages/', ConversationViewSet.as_view({'get': 'recent_messages'})),
-        
-        path('register/', RegisterView.as_view(), name='register'),
-        path('profile/', ProfileView.as_view(), name='profile'),
-        path('token/', TokenObtainPairView.as_view(), name='token_obtain_pair'),
-        path('token/refresh/', TokenRefreshView.as_view(), name='token_refresh'),
-        path('auth/google/', GoogleLoginView.as_view(), name='google_login'),
-        
-        path('password_reset/', include('django_rest_passwordreset.urls', namespace='password_reset')),
-        
-        # ВИПРАВЛЕНО: Прибираємо "views." з назви, якщо функція імпортована напряму, 
-        # АБО використовуємо views.get_me, якщо імпортували 'from api import views'
+
+        path('register/', RegisterView.as_view()),
+        path('profile/', ProfileView.as_view()),
+
+        path('token/', TokenObtainPairView.as_view()),
+        path('token/refresh/', TokenRefreshView.as_view()),
+
+        path('auth/google/', GoogleLoginView.as_view()),
+
         path('users/me/', views.get_me),
         path('users/search/', views.search_user_by_email),
-        path('api/reports/create/', CreateReportView.as_view(), name='report-create'),
+
+        path('password_reset/', include('django_rest_passwordreset.urls')),
 
        ])),
     

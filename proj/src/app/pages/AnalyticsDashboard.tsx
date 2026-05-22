@@ -110,21 +110,7 @@ export function AnalyticsDashboard() {
           icon={TrendingUp} 
           color="bg-orange-500" 
         />
-
-        {/* КАРТКИ ЧАТІВ (Тут тепер виводяться РЕАЛЬНІ цифри з бази) */}
-        <StatCard 
-          title="Total Chat Rooms" 
-          value={metrics.total_conversations} 
-          icon={MessageSquare} 
-          color="bg-purple-600" 
-        />
-        <StatCard 
-          title="Messages (Today)" 
-          value={metrics.messages_today} 
-          icon={MessageSquare} 
-          color="bg-indigo-500" 
-        />
-
+        
         {/* КАРТКИ МАРКЕТПЛЕЙСУ */}
         <StatCard 
           title="Marketplace Size" 
