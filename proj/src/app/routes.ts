@@ -14,13 +14,17 @@ import { Events } from "./pages/Events";
 import { Notifications } from "./pages/Notifications";
 import ReportPage from "./pages/Report";
 import ReportDashboard from "./pages/ReportDashboard";
-// 1. ІМПОРТУЙ ТУТ СВОЮ СТОРІНКУ АНАЛІТИКИ
+import { VerifyEmail } from "./pages/VerifyEmail"; // Це очікує 'export const VerifyEmail'// 1. ІМПОРТУЙ ТУТ СВОЮ СТОРІНКУ АНАЛІТИКИ
 import { AnalyticsDashboard } from "./pages/AnalyticsDashboard"; 
 
 export const router = createBrowserRouter([
   {
     path: "/login",
     Component: Login,
+  },
+  {
+    path: "/verify-email", 
+    Component: VerifyEmail,
   },
   {
     path: "/register",
