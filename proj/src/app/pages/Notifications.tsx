@@ -3,7 +3,6 @@ import { useNavigate } from 'react-router-dom';
 import { Bell, MessageCircle, Gift, Calendar, Filter } from 'lucide-react';
 import axios from 'axios';
 
-// Інтерфейс підлаштований під відповідь від Django
 interface Notification {
   id: number;
   notification_type: 'message' | 'offer' | 'event' | 'system';
@@ -21,103 +20,98 @@ export function Notifications() {
   const [statusFilter, setStatusFilter] = useState<'all' | 'unread'>('all');
   const [typeFilter, setTypeFilter] = useState<string>('all');
 
-  // Функція для безпечного відображення часу сповіщення
-const formatTime = (dateString: string | null | undefined) => {
-  if (!dateString) return '—';
+  // Безпечне відображення часу сповіщення
+  const formatTime = (dateString: string | null | undefined) => {
+    if (!dateString) return '—';
 
-  const parsedDate = new Date(dateString);
-  if (isNaN(parsedDate.getTime())) return '—';
+    const parsedDate = new Date(dateString);
+    if (isNaN(parsedDate.getTime())) return '—';
 
-  const now = new Date();
-  const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-  const yesterday = new Date(today);
-  yesterday.setDate(yesterday.getDate() - 1);
+    const now = new Date();
+    const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    const yesterday = new Date(today);
+    yesterday.setDate(yesterday.getDate() - 1);
 
-  const itemDate = new Date(parsedDate.getFullYear(), parsedDate.getMonth(), parsedDate.getDate());
-  
-  // Форматуємо час: "23:30"
-  const timeStr = parsedDate.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: false });
+    const itemDate = new Date(parsedDate.getFullYear(), parsedDate.getMonth(), parsedDate.getDate());
+    const timeStr = parsedDate.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: false });
 
-  // Логіка перевірки Сьогодні / Вчора англійською
-  if (itemDate.getTime() === today.getTime()) {
-    return `Today, ${timeStr}`;
-  } else if (itemDate.getTime() === yesterday.getTime()) {
-    return `Yesterday, ${timeStr}`;
-  } else {
-    // Для старіших дат виведе: "May 21, 23:30"
-    const dateStr = parsedDate.toLocaleDateString('en-US', { day: 'numeric', month: 'short' });
-    return `${dateStr}, ${timeStr}`;
-  }
-};
-  // Завантаження сповіщень з сервера
-  const loadNotifications = async () => {
-    setLoading(true); 
+    if (itemDate.getTime() === today.getTime()) {
+      return `Today, ${timeStr}`;
+    } else if (itemDate.getTime() === yesterday.getTime()) {
+      return `Yesterday, ${timeStr}`;
+    } else {
+      const dateStr = parsedDate.toLocaleDateString('en-US', { day: 'numeric', month: 'short' });
+      return `${dateStr}, ${timeStr}`;
+    }
+  };
+
+  // Завантаження сповіщень (параметр silent приховує Spinner при автооновленні)
+  const loadNotifications = async (silent = false) => {
+    if (!silent) setLoading(true);
     try {
-      const token = localStorage.getItem('accessToken'); 
-
+      const token = localStorage.getItem('accessToken');
       const response = await axios.get('http://127.0.0.1:8000/api/notifications/', {
         headers: { Authorization: `Bearer ${token}` }
       });
-
-      console.log("ВІДПОВІДЬ СЕРВЕРА:", response.data);
       setNotifications(response.data);
     } catch (error) {
-      console.error("Помилка при завантаженні сповіщень:", error);
+      console.error("Error loading notifications:", error);
     } finally {
-      setLoading(false); 
+      if (!silent) setLoading(false);
     }
   };
 
-  // Позначити всі як прочитані (для верхньої кнопки)
+  // Позначити всі як прочитані
   const handleMarkAllAsRead = async () => {
-    try {
-      const token = localStorage.getItem('accessToken'); 
-      if (!token) {
-        console.error("No token found in localStorage");
-        return;
-      }
+    // Оптимістичний апдейт інтерфейсу (миттєво міняємо стейт)
+    setNotifications(prev => prev.map(n => ({ ...n, is_read: true })));
 
-      await axios.post(
-        'http://127.0.0.1:8000/api/notifications/mark_all_as_read/', 
-        {}, 
-        { headers: { Authorization: `Bearer ${token}` } }
-      );
-      
-      setNotifications(prev => prev.map(n => ({ ...n, is_read: true })));
-    } catch (error) {
-      console.error('Error marking all as read:', error);
-    }
-  };
-
-  // Позначити тільки ОДНЕ сповіщення як прочитане
-  const handleMarkSingleAsRead = async (notificationId: number) => {
     try {
-      const token = localStorage.getItem('accessToken'); 
+      const token = localStorage.getItem('accessToken');
       if (!token) return;
 
-      // Шлемо PATCH запит на конкретний ID
-      await axios.patch(
-        `http://127.0.0.1:8000/api/notifications/${notificationId}/`, 
-        { is_read: true }, 
+      await axios.post(
+        'http://127.0.0.1:8000/api/notifications/mark_all_as_read/',
+        {},
         { headers: { Authorization: `Bearer ${token}` } }
       );
-      
-      // Змінюємо статус в стейті тільки для цього ID
-      setNotifications(prev => prev.map(n => 
-        n.id === notificationId ? { ...n, is_read: true } : n
-      ));
+    } catch (error) {
+      console.error('Error marking all as read:', error);
+      // У разі помилки сервера повертаємо стан назад за допомогою повторного завантаження
+      loadNotifications(true);
+    }
+  };
+
+  // Позначити поодиноке сповіщення як прочитане
+  const handleMarkSingleAsRead = async (notificationId: number) => {
+    // Оптимістичне оновлення
+    setNotifications(prev => prev.map(n =>
+      n.id === notificationId ? { ...n, is_read: true } : n
+    ));
+
+    try {
+      const token = localStorage.getItem('accessToken');
+      if (!token) return;
+
+      await axios.patch(
+        `http://127.0.0.1:8000/api/notifications/${notificationId}/`,
+        { is_read: true },
+        { headers: { Authorization: `Bearer ${token}` } }
+      );
     } catch (error) {
       console.error('Error marking single notification as read:', error);
+      loadNotifications(true);
     }
   };
 
   // Клік на рядок сповіщення
   const handleNotificationClick = async (notification: Notification) => {
     if (!notification.is_read) {
-      await handleMarkSingleAsRead(notification.id);
+      // Виконується миттєво без блокування потоку
+      handleMarkSingleAsRead(notification.id);
     }
 
-    // Навігація залежно від типу
+    // Навігація працює без затримок на мережеві запити
     switch (notification.notification_type) {
       case 'message':
         navigate(`/chat?chatId=${notification.target_id}`);
@@ -133,7 +127,6 @@ const formatTime = (dateString: string | null | undefined) => {
     }
   };
 
-  // Вибір іконки
   const getNotificationIcon = (type: string) => {
     switch (type) {
       case 'message': return <MessageCircle className="w-5 h-5 text-blue-600" />;
@@ -143,18 +136,17 @@ const formatTime = (dateString: string | null | undefined) => {
     }
   };
 
-  // Перший запуск + інтервал автооновлення (кожні 30 сек)
+  // Перший запуск та автооновлення у фоні (без увімкнення Loader)
   useEffect(() => {
-    loadNotifications(); 
+    loadNotifications(false);
 
     const interval = setInterval(() => {
-      loadNotifications(); 
+      loadNotifications(true); // silent = true
     }, 30000);
 
     return () => clearInterval(interval);
   }, []);
 
-  // Фільтрація списку на клієнті
   const filteredNotifications = notifications
     .filter(n => statusFilter === 'all' || !n.is_read)
     .filter(n => typeFilter === 'all' || n.notification_type === typeFilter);
@@ -177,9 +169,9 @@ const formatTime = (dateString: string | null | undefined) => {
           </div>
           <p className="text-gray-600">Stay updated with events in your dormitory</p>
         </div>
-        
+
         {unreadCount > 0 && (
-          <button 
+          <button
             onClick={handleMarkAllAsRead}
             className="text-sm font-medium text-blue-600 hover:text-blue-800 transition-colors"
           >
@@ -251,7 +243,7 @@ const formatTime = (dateString: string | null | undefined) => {
               <div className="flex-1">
                 <div className="flex justify-between items-start">
                   <h3 className={`font-semibold ${!n.is_read ? 'text-gray-900' : 'text-gray-600'}`}>{n.title}</h3>
-                  <span className="text-[10px] text-gray-400 font-medium">
+                  <span className="text-[10px] text-gray-400 font-medium operational-time">
                     {formatTime(n.created_at)}
                   </span>
                 </div>
