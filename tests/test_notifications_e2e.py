@@ -11,7 +11,7 @@ def test_notifications_page_lifecycle(logged_in_driver):
     driver = logged_in_driver
     wait = WebDriverWait(driver, self_timeout)
 
-    print("\n[STEP 1] Налаштування універсального моку мережі (Fetch + XHR/Axios) через CDP...")
+    print("\n[STEP 1] Setting up a universal network mock (Fetch + XHR/Axios) through CDP...")
     
     mock_network_js = """
     (function() {
@@ -20,7 +20,7 @@ def test_notifications_page_lifecycle(logged_in_driver):
                 "id": 991,
                 "notification_type": "message",
                 "title": "E2E Chat Alert",
-                "description": "Тестове повідомлення від Selenium",
+                "description": "Test message from Selenium",
                 "target_id": "chat_xyz",
                 "is_read": false,
                 "created_at": new Date().toISOString()
@@ -29,14 +29,14 @@ def test_notifications_page_lifecycle(logged_in_driver):
                 "id": 992,
                 "notification_type": "event",
                 "title": "E2E Event Workshop",
-                "description": "Прочитана подія",
+                "description": "Read event",
                 "target_id": null,
                 "is_read": true,
                 "created_at": new Date().toISOString()
             }
         ];
 
-        // 1. Мокаємо Fetch
+        // 1. Mock Fetch
         const origFetch = window.fetch;
         window.fetch = async function(...args) {
             if (args[0] && args[0].includes('/api/notifications/')) {
@@ -49,7 +49,7 @@ def test_notifications_page_lifecycle(logged_in_driver):
             return origFetch(...args);
         };
 
-        // 2. Мокаємо XMLHttpRequest (для Axios)
+        // 2. Mock XMLHttpRequest (for Axios)
         const open = XMLHttpRequest.prototype.open;
         XMLHttpRequest.prototype.open = function(method, url) {
             if (url && url.includes('/api/notifications/')) {
@@ -67,48 +67,48 @@ def test_notifications_page_lifecycle(logged_in_driver):
     })();
     """
     
-    # Реєструємо скрипт в ядрі Chromium, щоб він відпрацьовував ЗАВЖДИ
+    # Register the script in the Chromium engine so that it is executed ALWAYS
     driver.execute_cdp_cmd("Page.addScriptToEvaluateOnNewDocument", {
         "source": mock_network_js
     })
 
-    print("[STEP 2] Перехід на сторінку та підготовка localStorage...")
+    print("[STEP 2] Navigating to the page and preparing localStorage...")
     driver.get(NOTIFICATIONS_URL)
     
-    # Гарантуємо наявність токена, щоб Axios не падав до запиту
+    # Ensure that the token is present so Axios does not fail before making the request
     driver.execute_script("localStorage.setItem('accessToken', 'mock-e2e-token-123');")
     
-    # Перезавантажуємо сторінку, щоб React запустився вже з токеном та активованим моком мережі
+    # Reload the page so React starts with the token and the activated network mock
     driver.refresh()
     wait.until(lambda d: d.execute_script("return document.readyState") == "complete")
     time.sleep(2)
 
-    print("[STEP 3] Перевірка відображення карток сповіщень...")
+    print("[STEP 3] Checking notification card display...")
     unread_card_xpath = "//h3[contains(text(), 'E2E Chat Alert')]/ancestor::div[contains(@class, 'cursor-pointer')]"
     read_card_xpath = "//h3[contains(text(), 'E2E Event Workshop')]/ancestor::div[contains(@class, 'cursor-pointer')]"
     
     try:
         unread_card = wait.until(EC.visibility_of_element_located((By.XPATH, unread_card_xpath)))
-        assert "Тестове повідомлення від Selenium" in unread_card.text
-        print("  -> Сповіщення успішно відрендерилися в UI!")
+        assert "Test message from Selenium" in unread_card.text
+        print("  -> Notifications were successfully rendered in the UI!")
     except Exception as e:
-        # Робимо скріншот, щоб побачити реальний стан екрана (можливо, там просто білий екран через помилку React)
+        # Take a screenshot to see the actual state of the screen, possibly just a blank screen due to a React error
         driver.save_screenshot("notifications_error_fallback.png")
-        print("[ERR] Картку не знайдено. Скріншот збережено як 'notifications_error_fallback.png'")
+        print("[ERR] Card not found. Screenshot saved as 'notifications_error_fallback.png'")
         raise e
 
-    print("[STEP 4] Тестування реальної фільтрації статусів...")
+    print("[STEP 4] Testing actual status filtering...")
     try:
         unread_btn = wait.until(EC.element_to_be_clickable((By.XPATH, "//button[contains(text(), 'Unread')]")))
         unread_btn.click()
         
         wait.until(EC.invisibility_of_element_located((By.XPATH, read_card_xpath)))
-        print("  -> Прочитана картка успішно зникла після фільтрації.")
+        print("  -> The read card successfully disappeared after filtering.")
         
         assert driver.find_element(By.XPATH, unread_card_xpath).is_displayed()
-        print("  -> Фільтрація статусів відпрацювала коректно на рівні React State!")
+        print("  -> Status filtering worked correctly at the React State level!")
         
     except Exception as e:
-        pytest.fail(f"Помилка під час фільтрації: {e}")
+        pytest.fail(f"Error during filtering: {e}")
 
-    print("\n[SUCCESS] E2E тест сповіщень завершився успішно!")
+    print("\n[SUCCESS] E2E notifications test completed successfully!")

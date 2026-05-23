@@ -8,7 +8,7 @@ from selenium.webdriver.support import expected_conditions as EC
 from conftest import ADMIN_EMAIL, ADMIN_PASSWORD, BASE_URL
 
 def test_admin_login_and_dashboard_welcome():
-    """Тест перевірки авторизації та вітального банера з розумним очікуванням."""
+    """Test for verifying authorization and the welcome banner with smart waiting."""
     from selenium.webdriver.chrome.service import Service
     from webdriver_manager.chrome import ChromeDriverManager
     
@@ -21,17 +21,17 @@ def test_admin_login_and_dashboard_welcome():
     print("\n[INFO] Login page opened.")
     
     try:
-        # 1. Чекаємо на поле Email
+        # 1. Wait for the Email field
         email_input = wait.until(
             EC.visibility_of_element_located((By.XPATH, "//input[@type='email' or @type='text']"))
         )
         
-        # 2. Чекаємо на поле Пароль
+        # 2. Wait for the Password field
         password_input = wait.until(
             EC.visibility_of_element_located((By.XPATH, "//input[@type='password']"))
         )
         
-        # 3. Чекаємо на кнопку (шукаємо type='submit' АБО будь-яку кнопку всередині форми)
+        # 3. Wait for the button (search for type='submit' OR any button inside the form)
         submit_button = wait.until(
             EC.element_to_be_clickable((By.XPATH, "//form//button | //button[@type='submit']"))
         )
@@ -40,9 +40,9 @@ def test_admin_login_and_dashboard_welcome():
     except Exception as e:
         driver.save_screenshot("login_elements_wait_error.png")
         driver.quit()
-        raise AssertionError(f"Не вдалося знайти елементи форми логіну. Скріншот збережено. Помилка: {e}")
+        raise AssertionError(f"Failed to find the login form elements. Screenshot saved. Error: {e}")
     
-    # Взаємодія
+    # Interaction
     email_input.clear()
     email_input.send_keys(ADMIN_EMAIL)
     
@@ -52,11 +52,11 @@ def test_admin_login_and_dashboard_welcome():
     submit_button.click()
     print("[INFO] Login form submitted.")
     
-    # Чекаємо зміни URL сторінки
+    # Wait for the page URL to change
     wait.until(EC.url_changes(BASE_URL))
-    time.sleep(1) # коротка пауза для рендеру дашборду
+    time.sleep(1) # Short pause for dashboard rendering
     
-    # Очікуємо завантаження головного тексту на дашборді
+    # Wait for the main text on the dashboard to load
     welcome_heading = wait.until(
         EC.visibility_of_element_located((By.TAG_NAME, "h1"))
     )

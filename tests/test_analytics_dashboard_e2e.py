@@ -7,18 +7,18 @@ ANALYTICS_URL = "http://localhost:5173/admin/analytics"
 
 def test_analytics_dashboard_loading_and_cards(logged_in_driver):
     """
-    E2E тест: Використовує готову сесію адміна, переходить на сторінку
-    аналітики платформи та валідує наявність карток з метриками за допомогою Explicit Waits.
+    E2E test: Uses an existing admin session, navigates to the platform
+    analytics page, and validates the presence of metric cards using Explicit Waits.
     """
     driver = logged_in_driver
-    # Збільшуємо час очікування до 15 секунд на випадок повільного API
+    # Increase the wait time to 15 seconds in case of a slow API
     wait = WebDriverWait(driver, 15)
 
-    # 1. Переходимо на сторінку аналітики
+    # 1. Navigate to the analytics page
     driver.get(ANALYTICS_URL)
     print(f"\n[INFO] Navigated directly to Analytics page: {ANALYTICS_URL}")
 
-    # 2. Очікуємо завантаження головного заголовка сторінки
+    # 2. Wait for the main page heading to load
     try:
         page_title = wait.until(
             EC.visibility_of_element_located((By.XPATH, "//h1[contains(text(), 'Platform Growth') or contains(text(), 'Statistics')]"))
@@ -31,7 +31,7 @@ def test_analytics_dashboard_loading_and_cards(logged_in_driver):
             "Check if the route is correctly specified in the ANALYTICS_URL constant."
         )
 
-    # 3. Список метрик для перевірки (використовуємо підрядки для гнучкості)
+    # 3. List of metrics to check (using substrings for flexibility)
     metrics_to_check = [
         "Residents",
         "Chat",
@@ -43,11 +43,11 @@ def test_analytics_dashboard_loading_and_cards(logged_in_driver):
     print("[INFO] Validating analytical cards with explicit waits...")
     for metric in metrics_to_check:
         try:
-            # 🎯 Гнучкий XPath: переводить текст сторінки в нижній регістр і шукає збіг
-            # Це захищає від різниці типу 'Total Chat Rooms' vs 'Chat rooms'
+            #  Flexible XPath: converts the page text to lowercase and searches for a match
+            # This protects against differences such as 'Total Chat Rooms' vs 'Chat rooms'
             xpath_selector = f"//*[contains(translate(text(), 'ABCDEFGHIJKLMNOPQRSTUVWXYZ', 'abcdefghijklmnopqrstuvwxyz'), '{metric.lower()}')]"
             
-            # Чекаємо появи кожної картки окремо (вирішує проблему асинхронності API)
+            # Wait for each card to appear separately to handle API asynchronicity
             card_title = wait.until(EC.visibility_of_element_located((By.XPATH, xpath_selector)))
             print(f"  - Verified card containing: '{metric}'")
         except Exception:

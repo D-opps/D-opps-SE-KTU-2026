@@ -66,7 +66,7 @@ def test_marketplace_grid_and_creation_e2e(logged_in_driver):
     except Exception:
         _handle_detailed_debug(driver, "STEP 4 FAIL: Unexpected DOM layout changes inside text fields.")
 
-    # Створення тестового файлу зображення
+    # Create a test image file
     dummy_image_path = os.path.abspath("e2e_marketplace_image.jpg")
     with open(dummy_image_path, "wb") as f:
         f.write(b"\xFF\xD8\xFF\xE0\x00\x10JFIF\x00\x01\x01\x01\x00\x60\x00\x60\x00\x00\xFF\xDB\x00\x43\x00\xFF\xD9")
@@ -102,7 +102,7 @@ def test_marketplace_grid_and_creation_e2e(logged_in_driver):
         submit_btn.click()
         
         time.sleep(1.5)
-        # Примусово ховаємо модалку, якщо вона забагалася через мережу
+        # Force-hide the modal if it became stuck due to the network
         driver.execute_script(
             "document.querySelectorAll('h2').forEach(el => { "
             "  if(el.innerText.includes('Create item')) { "
@@ -118,7 +118,7 @@ def test_marketplace_grid_and_creation_e2e(logged_in_driver):
 
     print("[STEP 6] Verifying new product card in UI grid...")
     try:
-        # Використовуємо звичайний потрійний рядок, передаємо змінні через arguments
+        # Use a regular triple-quoted string and pass variables through arguments
         inject_card_js = """
         const grid = document.querySelector('div[class*="grid"]') || document.querySelector('main') || document.body;
         const newCard = document.createElement('div');
@@ -150,8 +150,8 @@ def test_marketplace_grid_and_creation_e2e(logged_in_driver):
         product_card_xpath = "//div[@id='e2e-mock-card']"
         product_card = wait.until(EC.presence_of_element_located((By.XPATH, product_card_xpath)))
         
-        assert product_card.find_element(By.XPATH, ".//span[contains(text(), 'USED')]").is_displayed(), "Метка USED відсутня"
-        assert product_card.find_element(By.XPATH, f".//p[contains(text(), '${product_price}')]").is_displayed(), "Ціна не збігається"
+        assert product_card.find_element(By.XPATH, ".//span[contains(text(), 'USED')]").is_displayed(), "The USED label is missing"
+        assert product_card.find_element(By.XPATH, f".//p[contains(text(), '${product_price}')]").is_displayed(), "The price does not match"
         
         print(f"\n[SUCCESS] E2E Lifecycle completed successfully for item: '{product_name}'!")
         

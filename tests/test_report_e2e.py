@@ -5,12 +5,12 @@ from selenium.webdriver.common.by import By
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
 
-# Перевірте, чи у вашому App.tsx роут звучить саме як /report/ чи можливо /reports/
+# Check whether the route in your App.tsx is exactly /report/ or perhaps /reports/
 REPORT_URL = "http://localhost:5173/report/product/42"
 
 @pytest.fixture(scope="function")
 def authorized_clean_driver():
-    """Створює чистий браузер та безпечно інжектує токен до старту React-компонентів"""
+    """Creates a clean browser and safely injects the token before the React components start"""
     options = webdriver.ChromeOptions()
     options.add_argument("--headless=new")
     options.add_argument("--no-sandbox")
@@ -18,13 +18,13 @@ def authorized_clean_driver():
     
     driver = webdriver.Chrome(options=options)
     
-    # КРОК А: Відкриваємо сторінку (вона може спочатку подумати, що ми не авторизовані)
+    # STEP A: Open the page (it may initially think that we are not authorized)
     driver.get(REPORT_URL)
     
-    # КРОК Б: Швидко записуємо токен в localStorage цього домену
+    # STEP B: Quickly write the token to localStorage for this domain
     driver.execute_script("localStorage.setItem('accessToken', 'mock-report-user-token-777');")
     
-    # КРОК В: Миттєво оновлюємо сторінку. Тепер React завантажується, бачачи токен з першої мілісекунди
+    # STEP C: Immediately reload the page. Now React loads while seeing the token from the very first millisecond
     driver.execute_script("window.location.reload();")
     
     yield driver
@@ -35,8 +35,8 @@ def test_submit_complaint_flow(authorized_clean_driver):
     driver = authorized_clean_driver
     wait = WebDriverWait(driver, 10)
 
-    print("\n[STEP 1] Динамічна ін'єкція моку для перехоплення Axios-посту на /api/reports/...")
-    # Ставимо перехоплювач прямо в поточну сесію вікна
+    print("\n[STEP 1] Dynamic mock injection to intercept the Axios POST request to /api/reports/...")
+    # Set the interceptor directly in the current window session
     mock_report_api_js = """
     (function() {
         const origOpen = XMLHttpRequest.prototype.open;
@@ -54,50 +54,50 @@ def test_submit_complaint_flow(authorized_clean_driver):
     """
     driver.execute_script(mock_report_api_js)
 
-    print("[STEP 2] Очікування повного завантаження DOM та валідація сторінки...")
+    print("[STEP 2] Waiting for the DOM to fully load and validating the page...")
     try:
-        # Чекаємо на головний заголовок форми "Complain?"
+        # Wait for the main form heading "Complain?"
         header_title = wait.until(EC.visibility_of_element_located((By.XPATH, "//h2[contains(text(), 'Complain?')]")))
-        print("  -> Сторінку скарги успішно завантажено!")
+        print("  -> The complaint page loaded successfully!")
     except Exception as e:
-        # Якщо знову впаде — ми побачимо, де саме знаходився браузер (можливо, на /login)
-        print(f"[DEBUG INFO] Поточний URL браузера при падінні: {driver.current_url}")
+        # If it fails again, we will see exactly where the browser was located (possibly on /login)
+        print(f"[DEBUG INFO] Current browser URL when the test failed: {driver.current_url}")
         driver.save_screenshot("report_timeout_debug.png")
         raise e
 
-    print("[STEP 3] Вибір причини скарги (Fraud)...")
-    # Шукаємо блок з текстом "Fraud"
+    print("[STEP 3] Selecting the complaint reason (Fraud)...")
+    # Find the block with the text "Fraud"
     fraud_option = wait.until(EC.element_to_be_clickable((By.XPATH, "//span[contains(text(), 'Fraud')]/ancestor::div[contains(@class, 'cursor-pointer')]")))
     
-    # Клікаємо через JavaScript, щоб уникнути будь-яких ElementClickIntercepted помилок
+    # Click through JavaScript to avoid any ElementClickIntercepted errors
     driver.execute_script("arguments[0].click();", fraud_option)
-    print("  -> Причину 'Fraud' обрано.")
+    print("  -> The 'Fraud' reason has been selected.")
 
-    print("[STEP 4] Заповнення текстового поля деталей...")
+    print("[STEP 4] Filling in the details text field...")
     textarea = driver.find_element(By.TAG_NAME, "textarea")
-    textarea.send_keys("Автоматичний тест: скарга на фейковий товар.")
+    textarea.send_keys("Automated test: complaint about a fake product.")
 
-    print("[STEP 5] Надсилання скарги через JS-клік...")
+    print("[STEP 5] Submitting the complaint using a JS click...")
     submit_btn = driver.find_element(By.XPATH, "//button[@type='submit']")
     
-    # Клікаємо на сабміт
+    # Click submit
     driver.execute_script("arguments[0].click();", submit_btn)
 
-    # Очікуємо відпрацювання анімації або редиректу (кнопка має зникнути з DOM)
+    # Wait for the animation or redirect to complete (the button should disappear from the DOM)
     wait.until(EC.staleness_of(submit_btn))
-    print("  -> Тест успішно пройдено! Скаргу надіслано.")
+    print("  -> Test completed successfully! The complaint has been submitted.")
 
 
 def test_cancel_complaint_navigation(authorized_clean_driver):
     driver = authorized_clean_driver
     wait = WebDriverWait(driver, 10)
 
-    print("\n[STEP 1] Перевірка кнопки скасування скарги...")
+    print("\n[STEP 1] Checking the complaint cancellation button...")
     try:
         cancel_btn = wait.until(EC.element_to_be_clickable((By.XPATH, "//button[contains(text(), 'I changed my mind')]")))
         driver.execute_script("arguments[0].click();", cancel_btn)
         wait.until(EC.staleness_of(cancel_btn))
-        print("  -> Повернення назад працює коректно.")
+        print("  -> Returning back works correctly.")
     except Exception as e:
-        print(f"[DEBUG INFO] Поточний URL при падінні: {driver.current_url}")
+        print(f"[DEBUG INFO] Current URL when the test failed: {driver.current_url}")
         raise e

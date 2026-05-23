@@ -17,22 +17,22 @@ def driver():
     driver.quit()
 
 def test_verify_email_success_flow(driver):
-    # Прямий перехід
+    # Direct navigation
     driver.get(f"{BASE_URL}/verify-email?token=valid-token&email=test@example.com")
     
-    # Даємо час на рендер та мережеві запити
+    # Give time for rendering and network requests
     import time
     time.sleep(3)
     
-    # Виводимо весь текст тіла сторінки
+    # Output all text from the page body
     body_text = driver.find_element(By.TAG_NAME, "body").text
     print(f"\n--- BODY TEXT SUCCESS FLOW ---")
     print(body_text)
     print(f"------------------------------")
     
-    # Тепер тест просто виведе текст, замість того щоб падати. 
-    # Запустіть pytest -s і надішліть мені те, що виведеться в консоль.
-    assert len(body_text) > 0, "Сторінка порожня!"
+    # Now the test will simply output the text instead of failing. 
+    # Run pytest -s and send me what is displayed in the console.
+    assert len(body_text) > 0, "The page is empty!"
 
 def test_verify_email_failed_flow(driver):
     driver.get(f"{BASE_URL}/verify-email?token=expired-token&email=test@example.com")
@@ -45,4 +45,4 @@ def test_verify_email_failed_flow(driver):
     print(body_text)
     print(f"-----------------------------")
     
-    assert len(body_text) > 0, "Сторінка порожня!"
+    assert len(body_text) > 0, "The page is empty!"

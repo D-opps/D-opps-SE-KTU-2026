@@ -8,29 +8,29 @@ MARKETPLACE_GRID_URL = "http://localhost:5173/marketplace"
 
 def test_item_details_visitor_flow(logged_in_driver):
     """
-    Динамічний E2E тест деталей товару:
-    Заходимо на маркетплейс -> Беремо посилання на перший живий товар -> Тестуємо деталі.
-    Повністю виключає помилки невідповідності даних (Data Mismatch).
+    Dynamic E2E test of item details:
+    Navigate to the marketplace -> Get the link to the first active item -> Test its details.
+    Completely eliminates data mismatch errors.
     """
     driver = logged_in_driver
     wait = WebDriverWait(driver, 15)
 
-    # 1. Переходимо на загальну сторінку маркетплейсу
+    # 1. Navigate to the main marketplace page
     driver.get(MARKETPLACE_GRID_URL)
     print("\n[INFO] Navigated to Marketplace grid to dynamically discover an active item...")
     
-    # Чекаємо, поки сторінка завантажиться і зникнуть стартові спінери
+    # Wait until the page loads and the initial spinners disappear
     wait.until(lambda d: d.execute_script("return document.readyState") == "complete")
-    time.sleep(3)  # Даємо React час отримати товари від бекенду та відрендерити картки
+    time.sleep(3)  # Give React time to receive products from the backend and render the cards
 
-    # 2. Шукаємо посилання на деталі товару всередині сітки (grid)
-    # Зважаючи на createBrowserRouter, посилання мають вести на /marketplace/:id
+    # 2. Search for an item details link inside the grid
+    # Considering createBrowserRouter, the links should lead to /marketplace/:id
     try:
-        # Шукаємо будь-яке посилання, яке містить "/marketplace/" і закінчується цифрою (ID)
-        # Або просто будь-яке посилання на картку товару
+        # Find any link that contains "/marketplace/" and ends with a number (ID)
+        # Or simply any link to a product card
         product_links = driver.find_elements(By.XPATH, "//a[contains(@href, '/marketplace/')]")
         
-        # Відфільтровуємо посилання, щоб це було саме посилання на деталь (наприклад, /marketplace/1, а не сам маркетплейс)
+        # Filter the links so that it is specifically a details link, for example, /marketplace/1, not the marketplace itself
         valid_item_url = None
         for link in product_links:
             href = link.get_attribute("href")
@@ -39,7 +39,7 @@ def test_item_details_visitor_flow(logged_in_driver):
                 break
 
         if not valid_item_url:
-            # Альтернативний загальний пошук, якщо структура карток специфічна
+            # Alternative general search if the card structure is specific
             print("[WARNING] Precise XPATH didn't match. Trying fallback to any product link...")
             valid_item_url = wait.until(
                 EC.presence_of_element_located((By.XPATH, "//div[contains(@class, 'card')]//a | //a"))
@@ -50,16 +50,16 @@ def test_item_details_visitor_flow(logged_in_driver):
     except Exception:
         driver.save_screenshot("marketplace_empty_grid_error.png")
         raise AssertionError(
-            "Не знайдено жодного товару на сторінці маркетплейсу. "
-            "Перевірте, чи запущені Django фікстури, або чи картки товарів загорнуті в тег <a>."
+            "No items were found on the marketplace page. "
+            "Check whether the Django fixtures are running or whether product cards are wrapped in an <a> tag."
         )
 
-    # 3. Переходимо на сторінку деталей знайденого реального товару
+    # 3. Navigate to the details page of the discovered real item
     driver.get(valid_item_url)
     print(f"[INFO] Transitioned to Item Details page: {valid_item_url}")
-    time.sleep(2)  # Очікуємо завантаження даних для цього конкретного ID
+    time.sleep(2)  # Wait for the data for this specific ID to load
 
-    # 4. Валідуємо відображення головного заголовка (компонент ItemDetails)
+    # 4. Validate the display of the main heading in the ItemDetails component
     try:
         item_title = wait.until(EC.visibility_of_element_located((By.XPATH, "//h1")))
         print(f"[SUCCESS] Component ItemDetails rendered successfully! Product title: '{item_title.text}'")
@@ -69,28 +69,28 @@ def test_item_details_visitor_flow(logged_in_driver):
         for entry in driver.get_log('browser'):
             print(f"  [{entry['level']}] {entry['message']}")
         raise AssertionError(
-            f"Сторінка деталей ({driver.current_url}) застрягла на завантаженні або видала 404. "
-            "Перевірте консоль браузера вище."
+            f"The details page ({driver.current_url}) got stuck loading or returned a 404 error. "
+            "Check the browser console above."
         )
 
-    # 5. Перевіряємо відображення метаданих (наприклад, наявність ціни з валютою)
+    # 5. Check the display of metadata, for example, the presence of a price with a currency symbol
     try:
         price_element = wait.until(EC.visibility_of_element_located((By.XPATH, "//*[contains(text(), '$') or contains(text(), 'грн') or matches(., '^\\d+$')]")))
         print(f"  - UI Metadata verified. Detected price tag: '{price_element.text}'")
     except Exception:
         print("[WARNING] Numeric price tag with currency symbol not found, skipping price assertion.")
 
-    # 6. Перевіряємо логіку взаємодії (Visitor vs Owner)
+    # 6. Check the interaction logic (Visitor vs Owner)
     page_source_text = driver.find_element(By.TAG_NAME, "body").text
     
-    # Якщо товар належить поточному авторизованому юзеру, система має заблокувати чат із самим собою
+    # If the item belongs to the currently authorized user, the system should prevent chatting with themselves
     if "cannot contact yourself" in page_source_text.lower() or "your own" in page_source_text.lower():
         print("[SUCCESS] Detected Owner state constraint. Safety restriction block functions as intended.")
     else:
-        # Якщо товар чужий (Visitor Flow), кнопка зв'язку має бути доступною
+        # If the item belongs to someone else (Visitor Flow), the contact button should be available
         try:
             contact_btn = wait.until(EC.element_to_be_clickable((By.XPATH, "//button[contains(., 'Contact') or contains(., 'Chat') or contains(., 'Message')]")))
-            assert contact_btn.is_displayed(), "Кнопка зв'язку з продавцем мала бути на екрані"
+            assert contact_btn.is_displayed(), "The button for contacting the seller should be displayed on the screen"
             print("[SUCCESS] Visitor State Verified: Interaction buttons are fully active.")
         except Exception:
             print("[INFO] Contact button not found. Assuming alternative layout or design.")

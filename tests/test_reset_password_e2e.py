@@ -6,12 +6,12 @@ from selenium.webdriver.common.by import By
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
 
-# Симулюємо перехід за посиланням з пошти, де унікальний токен = dynamic-token-xyz
+# Simulate navigating through an email link, where the unique token = dynamic-token-xyz
 RESET_URL = "http://localhost:5173/reset-password/dynamic-token-xyz"
 
 @pytest.fixture(scope="function")
 def clean_driver():
-    """Ініціалізує ізольований браузер без додаткових сесій"""
+    """Initializes an isolated browser without additional sessions"""
     options = webdriver.ChromeOptions()
     options.add_argument("--headless=new")
     options.add_argument("--no-sandbox")
@@ -26,8 +26,8 @@ def test_reset_password_validation_and_success(clean_driver):
     driver = clean_driver
     wait = WebDriverWait(driver, 10)
 
-    print("\n[STEP 1] Підготовка стійкого моку для Django API через sessionStorage...")
-    # Мокаємо успішну відповідь від django-rest-passwordreset (код 200)
+    print("\n[STEP 1] Preparing a persistent mock for the Django API through sessionStorage...")
+    # Mock a successful response from django-rest-passwordreset (status code 200)
     mock_api_script = """
     (function() {
         const origOpen = XMLHttpRequest.prototype.open;
@@ -44,58 +44,58 @@ def test_reset_password_validation_and_success(clean_driver):
     """
     driver.execute_cdp_cmd("Page.addScriptToEvaluateOnNewDocument", {"source": mock_api_script})
 
-    print("[STEP 2] Відкриття сторінки скидання пароля...")
+    print("[STEP 2] Opening the password reset page...")
     driver.get(RESET_URL)
 
-    # Переконуємося, що сторінка DormLife завантажилась
+    # Make sure the DormLife page has loaded
     wait.until(EC.visibility_of_element_located((By.XPATH, "//h1[text()='DormLife']")))
     
-    # Знаходимо поля інпутів
+    # Find the input fields
     password_input = driver.find_element(By.XPATH, "//label[text()='New Password']/following::input[1]")
     confirm_input = driver.find_element(By.XPATH, "//label[text()='Confirm Password']/following::input[1]")
     submit_btn = driver.find_element(By.XPATH, "//button[@type='submit']")
 
-    print("[STEP 3] Перевірка валідації сили пароля на занадто слабкий пароль...")
-    # Вводимо пароль, що не відповідає вимогам (немає великої літери та цифри)
+    print("[STEP 3] Checking password strength validation using a password that is too weak...")
+    # Enter a password that does not meet the requirements (no uppercase letter or digit)
     password_input.send_keys("weakpass")
     confirm_input.send_keys("weakpass")
     
     driver.execute_script("arguments[0].click();", submit_btn)
 
-    # Очікуємо появу повідомлення про помилку валідації
+    # Wait for the validation error message to appear
     error_box = wait.until(EC.visibility_of_element_located((By.XPATH, "//p[contains(text(), 'Password does not meet all requirements')]")))
-    assert error_box.is_displayed(), "Екран не заблокував відправку слабкого пароля!"
-    print("  -> Інтерфейс успішно заблокував слабкий пароль.")
+    assert error_box.is_displayed(), "The screen did not block submission of a weak password!"
+    print("  -> The interface successfully blocked the weak password.")
 
-    print("[STEP 4] Перевірка валідації на невідповідність паролів...")
-    # Очищаємо поля
+    print("[STEP 4] Checking validation for mismatched passwords...")
+    # Clear the fields
     password_input.clear()
     confirm_input.clear()
     
-    # Вводимо сильний пароль, але різні значення в поля підтвердження
+    # Enter a strong password, but use different values in the confirmation fields
     password_input.send_keys("SecurePass123!")
     confirm_input.send_keys("DifferentPass123!")
     
     driver.execute_script("arguments[0].click();", submit_btn)
     
     wait.until(EC.text_to_be_present_in_element((By.XPATH, "//div[contains(@class, 'bg-red-50')]//p"), "Passwords do not match."))
-    print("  -> Інтерфейс успішно виявив невідповідність паролів.")
+    print("  -> The interface successfully detected the password mismatch.")
 
-    print("[STEP 5] Введення коректних даних та успішне скидання...")
+    print("[STEP 5] Entering valid data and successfully resetting the password...")
     confirm_input.clear()
-    confirm_input.send_keys("SecurePass123!") # Тепер паролі збігаються і є сильними
+    confirm_input.send_keys("SecurePass123!") # Now the passwords match and are strong
     
-    # Клікаємо на відправку форми
+    # Click to submit the form
     driver.execute_script("arguments[0].click();", submit_btn)
 
-    print("[STEP 6] Валідація Success-екрану...")
-    # Компонент React у разі успіху рендерить альтернативний блок з CheckCircle та кнопкою редиректу
+    print("[STEP 6] Validating the Success screen...")
+    # On success, the React component renders an alternative block with CheckCircle and a redirect button
     wait.until(EC.visibility_of_element_located((By.XPATH, "//h2[text()='Success!']")))
     
     success_text = driver.find_element(By.XPATH, "//p[contains(text(), 'Your password has been updated')]")
     assert success_text.is_displayed()
     
-    # Перевіряємо наявність кнопки швидкого переходу на логін
+    # Check that the quick navigation button to the login page is present
     login_link = driver.find_element(By.XPATH, "//a[contains(text(), 'Go to Login Now')]")
     assert login_link.is_displayed()
-    print("🎉 Тест успішно пройдено! Пароль оновлено, Success-екран відображено.")
+    print(" Test completed successfully! The password has been updated and the Success screen is displayed.")

@@ -10,17 +10,17 @@ DASHBOARD_URL = "http://localhost:5173/admin/reports"
 
 @pytest.fixture(scope="function")
 def admin_authorized_driver():
-    """Ініціалізує браузер, вмикає збір логів консолі та додає авторизацію"""
+    """Initializes the browser, enables console log collection, and adds authorization"""
     options = webdriver.ChromeOptions()
     options.add_argument("--headless=new")
     options.add_argument("--no-sandbox")
     options.add_argument("--disable-dev-shm-usage")
-    # Вмикаємо збір логів браузера для дебагу
+    # Enable browser log collection for debugging
     options.set_capability('goog:loggingPrefs', {'browser': 'ALL'})
     
     driver = webdriver.Chrome(options=options)
     
-    # Авторизуємося через базовий URL
+    # Authorize through the base URL
     driver.get("http://localhost:5173/")
     driver.execute_script("localStorage.setItem('accessToken', 'mock-admin-secure-token-111');")
     
@@ -35,20 +35,20 @@ def test_report_dashboard_lifecycle(admin_authorized_driver):
     initial_reports = [
         {
             "id": 501,
-            "reporter_name": "Іван Маніпулятор",
+            "reporter_name": "Ivan Manipulator",
             "reporter_email": "ivan@stu.edu",
-            "content_details": "Контрабандний кальян",
+            "content_details": "Contraband hookah",
             "reason": "fraud",
-            "description": "Продає заборонені речі в гуртожитку!",
+            "description": "Sells prohibited substances in the dormitory!",
             "status": "pending"
         }
     ]
 
-    print("\n[STEP 1] Реєстрація стійкого перехоплювача через CDP (до завантаження сторінки)...")
-    # Цей скрипт виконається в Chrome НАЙПЕРШИМ, ще до парсингу вашого React/Vite коду
+    print("\n[STEP 1] Registering a persistent interceptor through CDP before the page loads...")
+    # This script will be executed FIRST by Chrome, even before parsing your React/Vite code
     mock_api_script = f"""
     (function() {{
-        // Записуємо моки в sessionStorage, якщо їх там ще немає
+        // Write mocks to sessionStorage if they are not there yet
         if (!sessionStorage.getItem('mock_reports')) {{
             sessionStorage.setItem('mock_reports', JSON.stringify({json.dumps(initial_reports)}));
             sessionStorage.setItem('action_called', 'false');
@@ -82,43 +82,43 @@ def test_report_dashboard_lifecycle(admin_authorized_driver):
     }})();
     """
     
-    # Інжектуємо мок на рівні двигуна Chrome
+    # Inject the mock at the Chrome engine level
     driver.execute_cdp_cmd("Page.addScriptToEvaluateOnNewDocument", {"source": mock_api_script})
 
-    print("[STEP 2] Прямий перехід на сторінку Дашборду...")
+    print("[STEP 2] Direct navigation to the Dashboard page...")
     driver.get(DASHBOARD_URL)
 
-    print("[STEP 3] Очікування елементів інтерфейсу з повним дебагом у разі помилки...")
+    print("[STEP 3] Waiting for interface elements with full debugging in case of an error...")
     try:
-        # Чекаємо головний заголовок сторінки
+        # Wait for the main page heading
         wait.until(EC.visibility_of_element_located((By.XPATH, "//h1[contains(., 'Reports Management')]")))
     except Exception as e:
-        # ======= БЛОК ГЛИБОКОЇ ДІАГНОСТИКИ СЕРЕДОВИЩА =======
-        print("\n❌ БРАУЗЕР ЗАСТРЯГ! ЗБІР ДІАГНОСТИЧНИХ ДАНИХ:")
-        print(f"Поточний URL в Chrome: {driver.current_url}")
+        # ======= DEEP ENVIRONMENT DIAGNOSTICS BLOCK =======
+        print("\n THE BROWSER IS STUCK! COLLECTING DIAGNOSTIC DATA:")
+        print(f"Current URL in Chrome: {driver.current_url}")
         
-        # 1. Зберігаємо скріншот екрана (побачимо, чи там біла сторінка, чи помилка 404)
+        # 1. Save a screenshot of the screen to see whether it is a blank page or a 404 error
         driver.save_screenshot("dashboard_fatal_debug.png")
-        print("📸 Скріншот збережено у файл: dashboard_fatal_debug.png")
+        print(" Screenshot saved to file: dashboard_fatal_debug.png")
         
-        # 2. Виводимо помилки з консолі браузера (наприклад, не завантажився чанк, помилка JS тощо)
-        print("\n💬 ЛОГИ КОНСОЛІ БРАУЗЕРА (JS ERRORS):")
+        # 2. Output errors from the browser console, for example, a chunk failed to load or a JS error occurred
+        print("\n BROWSER CONSOLE LOGS (JS ERRORS):")
         for log in driver.get_log('browser'):
             print(f"   [{log['level']}] {log['message']}")
             
-        # 3. Виводимо HTML-код, який зараз бачить Selenium
-        print("\n📄 СТРУКТУРА HTML СТОРАНКИ (ПЕРШІ 500 СИМВОЛІВ):")
+        # 3. Output the HTML code currently visible to Selenium
+        print("\n PAGE HTML STRUCTURE (FIRST 500 CHARACTERS):")
         print(driver.page_source[:500])
         raise e
 
-    print("[STEP 4] Перевірка лічильника Total...")
+    print("[STEP 4] Checking the Total counter...")
     total_counter_xpath = "//p[text()='Total']/following-sibling::p"
     wait.until(EC.text_to_be_present_in_element((By.XPATH, total_counter_xpath), "1"))
     
-    print("[STEP 5] Натискання кнопки видалення контенту...")
+    print("[STEP 5] Clicking the remove content button...")
     remove_btn = wait.until(EC.element_to_be_clickable((By.XPATH, "//button[@title='Remove content']")))
     driver.execute_script("arguments[0].click();", remove_btn)
 
-    print("[STEP 6] Очікування оновлення статусу...")
+    print("[STEP 6] Waiting for the status update...")
     wait.until(EC.visibility_of_element_located((By.XPATH, "//div[contains(., 'Handled')]")))
-    print("🎉 Тест успішно пройдено!")
+    print("Test completed successfully!")
