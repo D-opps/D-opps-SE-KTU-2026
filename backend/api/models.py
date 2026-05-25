@@ -64,8 +64,11 @@ class Machine(models.Model):
     name = models.CharField(max_length=50)
     type = models.CharField(max_length=10, choices=TYPE_CHOICES)
     status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='free')
-    location = models.CharField(max_length=100) # Назва (н-р: "2 поверх")
-    
+    location = models.CharField(
+        max_length=100,
+        blank=True,
+        null=True)    
+    occupied_by = models.CharField(max_length=100, blank=True, null=True)
     # ЦЕ ПОЛЕ ОБОВ'ЯЗКОВЕ ДЛЯ ФІЛЬТРАЦІЇ:
     dormitory = models.IntegerField() 
     
