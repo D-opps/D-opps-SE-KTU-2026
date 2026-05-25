@@ -62,27 +62,33 @@ class MachineViewSet(viewsets.ModelViewSet):
 
         # Фільтрація: тільки машинки МОГО гуртожитку
         return Machine.objects.filter(dormitory=user.dormitory)
+    
+    def perform_create(self, serializer):
+        serializer.save(
+            dormitory=self.request.user.dormitory
+        )
 
     @action(detail=True, methods=['post'])
     def report_status(self, request, pk=None):
         machine = self.get_object()
         new_status = request.data.get('status')
+        # ДОДАЙТЕ ОТРИМАННЯ ІМЕНІ:
+        user_name = request.data.get('occupied_by', '') 
         notes = request.data.get('notes', '')
 
-        # Перевірка на валідність статусу
         valid_statuses = ['free', 'occupied', 'out-of-order']
         if new_status not in valid_statuses:
             return Response({'error': 'Invalid status'}, status=status.HTTP_400_BAD_REQUEST)
 
-        # 1. Оновлюємо базові поля для аудиту
+        # Оновлення
         machine.status = new_status
         machine.notes = notes
         machine.reported_by = request.user
         machine.last_reported_at = timezone.now()
-
-        # 2. Логіка таймера
+        
+        # ОСЬ ТУТ ДОДАЙТЕ ОНОВЛЕННЯ ІМЕНІ:
         if new_status == 'occupied':
-            # Беремо хвилини з запиту, або 30 за дефолтом
+            machine.occupied_by = user_name if user_name else "Користувач"
             try:
                 minutes = int(request.data.get('minutes', 30))
             except (ValueError, TypeError):
@@ -90,13 +96,12 @@ class MachineViewSet(viewsets.ModelViewSet):
             machine.end_time = timezone.now() + timedelta(minutes=minutes)
         
         elif new_status == 'free':
-            # Якщо вільна — скидаємо час завершення
             machine.end_time = None
-            machine.notes = '' # Очищаємо нотатки, якщо машинку полагодили/звільнили
+            machine.notes = ''
+            machine.occupied_by = '' # СКИДАЄМО ІМ'Я, КОЛИ МАШИНКА ВІЛЬНА
 
         machine.save()
         
-        # Повертаємо оновлені дані, щоб фронтенд відразу їх побачив
         serializer = self.get_serializer(machine)
         return Response(serializer.data)
 

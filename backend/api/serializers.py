@@ -66,8 +66,21 @@ class ReportSerializer(serializers.ModelSerializer):
 class MachineSerializer(serializers.ModelSerializer):
     class Meta:
         model = Machine
-        # Прибрали location, додали dormitory
-        fields = ['id', 'name', 'type', 'status', 'time_left', 'dormitory', 'notes', 'reported_by']
+        fields = [
+            'id',
+            'name',
+            'type',
+            'status',
+            'time_left',
+            'dormitory',
+            'location',
+            'notes',
+            'reported_by',
+            'occupied_by',
+            'end_time'
+        ]
+        read_only_fields = ['dormitory']
+        
 class ProductPhotoSerializer(serializers.ModelSerializer):
     class Meta:
         model = ProductPhoto
