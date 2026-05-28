@@ -74,7 +74,6 @@ const ReportDashboard = () => {
     return (
         <div className="p-6 max-w-7xl mx-auto min-h-screen bg-gray-50/50">
 
-            {/* HEADER */}
             <div className="flex flex-col md:flex-row md:items-center justify-between mb-8 gap-4">
                 <div>
                     <h1 className="text-3xl font-black text-gray-900 flex items-center gap-3">
@@ -105,7 +104,6 @@ const ReportDashboard = () => {
                 </div>
             </div>
 
-            {/* TABLE */}
             <div className="bg-white rounded-[2rem] shadow-xl border border-gray-100 overflow-hidden">
 
                 <div className="overflow-x-auto">
@@ -129,7 +127,6 @@ const ReportDashboard = () => {
                                     className="border-b hover:bg-blue-50/30"
                                 >
 
-                                    {/* REPORTER */}
                                     <td className="p-5">
                                         <div className="flex items-center gap-3">
                                             <div className="w-10 h-10 bg-indigo-100 rounded-full flex items-center justify-center">
@@ -146,7 +143,6 @@ const ReportDashboard = () => {
                                         </div>
                                     </td>
 
-                                    {/* CONTENT */}
                                     <td className="p-5">
                                         <div className="flex items-center gap-2 text-blue-600 font-bold">
                                             <Package size={16} />
@@ -154,17 +150,14 @@ const ReportDashboard = () => {
                                         </div>
                                     </td>
 
-                                    {/* REASON */}
                                     <td className="p-5 text-red-500 font-bold text-xs uppercase">
                                         {report.reason}
                                     </td>
 
-                                    {/* DESCRIPTION */}
                                     <td className="p-5 text-gray-600 italic text-sm">
                                         {report.description || 'No description'}
                                     </td>
 
-                                    {/* ACTIONS */}
                                     <td className="p-5 text-center">
 
                                         <div className={`mb-3 px-3 py-1 rounded-full text-xs font-bold border ${getStatusStyle(report.status)}`}>
@@ -219,7 +212,6 @@ const ReportDashboard = () => {
                     </table>
                 </div>
 
-                {/* EMPTY */}
                 {reports.length === 0 && !loading && (
                     <div className="p-20 text-center text-gray-400">
                         <Clock className="w-12 h-12 mx-auto mb-3" />
@@ -229,7 +221,6 @@ const ReportDashboard = () => {
                     </div>
                 )}
 
-                {/* LOADING */}
                 {loading && (
                     <div className="p-20 text-center text-blue-500 font-bold">
                         Loading...

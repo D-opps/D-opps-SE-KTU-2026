@@ -20,7 +20,6 @@ export function Notifications() {
   const [statusFilter, setStatusFilter] = useState<'all' | 'unread'>('all');
   const [typeFilter, setTypeFilter] = useState<string>('all');
 
-  // Безпечне відображення часу сповіщення
   const formatTime = (dateString: string | null | undefined) => {
     if (!dateString) return '—';
 
@@ -45,7 +44,6 @@ export function Notifications() {
     }
   };
 
-  // Завантаження сповіщень (параметр silent приховує Spinner при автооновленні)
   const loadNotifications = async (silent = false) => {
     if (!silent) setLoading(true);
     try {
@@ -61,9 +59,7 @@ export function Notifications() {
     }
   };
 
-  // Позначити всі як прочитані
   const handleMarkAllAsRead = async () => {
-    // Оптимістичний апдейт інтерфейсу (миттєво міняємо стейт)
     setNotifications(prev => prev.map(n => ({ ...n, is_read: true })));
 
     try {
@@ -77,14 +73,11 @@ export function Notifications() {
       );
     } catch (error) {
       console.error('Error marking all as read:', error);
-      // У разі помилки сервера повертаємо стан назад за допомогою повторного завантаження
       loadNotifications(true);
     }
   };
 
-  // Позначити поодиноке сповіщення як прочитане
   const handleMarkSingleAsRead = async (notificationId: number) => {
-    // Оптимістичне оновлення
     setNotifications(prev => prev.map(n =>
       n.id === notificationId ? { ...n, is_read: true } : n
     ));
@@ -104,14 +97,11 @@ export function Notifications() {
     }
   };
 
-  // Клік на рядок сповіщення
   const handleNotificationClick = async (notification: Notification) => {
     if (!notification.is_read) {
-      // Виконується миттєво без блокування потоку
       handleMarkSingleAsRead(notification.id);
     }
 
-    // Навігація працює без затримок на мережеві запити
     switch (notification.notification_type) {
       case 'message':
         navigate(`/chat?chatId=${notification.target_id}`);
@@ -136,12 +126,11 @@ export function Notifications() {
     }
   };
 
-  // Перший запуск та автооновлення у фоні (без увімкнення Loader)
   useEffect(() => {
     loadNotifications(false);
 
     const interval = setInterval(() => {
-      loadNotifications(true); // silent = true
+      loadNotifications(true); 
     }, 30000);
 
     return () => clearInterval(interval);
@@ -155,7 +144,6 @@ export function Notifications() {
 
   return (
     <div className="p-4 sm:p-6 max-w-4xl mx-auto min-h-screen">
-      {/* Шапка сторінки */}
       <div className="mb-6 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
           <div className="flex items-center gap-3 mb-2">
@@ -180,7 +168,6 @@ export function Notifications() {
         )}
       </div>
 
-      {/* Панель Фільтрів */}
       <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-4 mb-6">
         <div className="flex flex-col sm:flex-row gap-6">
           <div className="flex-1">
@@ -219,7 +206,6 @@ export function Notifications() {
         </div>
       </div>
 
-      {/* Список сповіщень */}
       {loading ? (
         <div className="flex justify-center py-20">
           <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-blue-600"></div>

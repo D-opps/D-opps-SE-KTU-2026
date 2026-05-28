@@ -21,17 +21,14 @@ def test_admin_login_and_dashboard_welcome():
     print("\n[INFO] Login page opened.")
     
     try:
-        # 1. Wait for the Email field
         email_input = wait.until(
             EC.visibility_of_element_located((By.XPATH, "//input[@type='email' or @type='text']"))
         )
         
-        # 2. Wait for the Password field
         password_input = wait.until(
             EC.visibility_of_element_located((By.XPATH, "//input[@type='password']"))
         )
         
-        # 3. Wait for the button (search for type='submit' OR any button inside the form)
         submit_button = wait.until(
             EC.element_to_be_clickable((By.XPATH, "//form//button | //button[@type='submit']"))
         )
@@ -42,7 +39,6 @@ def test_admin_login_and_dashboard_welcome():
         driver.quit()
         raise AssertionError(f"Failed to find the login form elements. Screenshot saved. Error: {e}")
     
-    # Interaction
     email_input.clear()
     email_input.send_keys(ADMIN_EMAIL)
     
@@ -52,11 +48,9 @@ def test_admin_login_and_dashboard_welcome():
     submit_button.click()
     print("[INFO] Login form submitted.")
     
-    # Wait for the page URL to change
     wait.until(EC.url_changes(BASE_URL))
-    time.sleep(1) # Short pause for dashboard rendering
+    time.sleep(1) 
     
-    # Wait for the main text on the dashboard to load
     welcome_heading = wait.until(
         EC.visibility_of_element_located((By.TAG_NAME, "h1"))
     )

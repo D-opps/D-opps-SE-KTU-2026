@@ -22,7 +22,6 @@ class User(AbstractUser):
     REQUIRED_FIELDS = ['username']
 
 class Product(models.Model):
-    # Визначаємо список категорій (код для бази, назва для людей)
     CATEGORY_CHOICES = [
         ('electronics', 'Electronics'),
         ('furniture', 'Furniture'),
@@ -36,7 +35,6 @@ class Product(models.Model):
     price = models.DecimalField(max_digits=10, decimal_places=2)
     description = models.TextField()
     
-    # Оновлюємо це поле:
     category = models.CharField(
         max_length=50, 
         choices=CATEGORY_CHOICES, 
@@ -69,13 +67,11 @@ class Machine(models.Model):
         blank=True,
         null=True)    
     occupied_by = models.CharField(max_length=100, blank=True, null=True)
-    # ЦЕ ПОЛЕ ОБОВ'ЯЗКОВЕ ДЛЯ ФІЛЬТРАЦІЇ:
     dormitory = models.IntegerField() 
     
     end_time = models.DateTimeField(null=True, blank=True)
     notes = models.TextField(blank=True, null=True)
     
-    # Для аудиту:
     reported_by = models.ForeignKey(
         settings.AUTH_USER_MODEL, 
         on_delete=models.SET_NULL, 
@@ -99,14 +95,13 @@ class ProductPhoto(models.Model):
     def __str__(self):
         return f"Photo for {self.product.title}"
     
-# backend/api/models.py
 
 class Conversation(models.Model):
     TYPE_CHOICES = (
-        ('private', 'Private Chat'),       # Звичайний чат між юзерами
-        ('market', 'Marketplace'),         # Чат по товару
-        ('group', 'Dormitory Group'),      # Гуртожиток
-        ('admin', 'Admin Support'),        # Підтримка
+        ('private', 'Private Chat'),       
+        ('market', 'Marketplace'),         
+        ('group', 'Dormitory Group'),      
+        ('admin', 'Admin Support'),        
         ('global', 'Global Chat') 
     )
     
@@ -117,9 +112,8 @@ class Conversation(models.Model):
     )
     participants = models.ManyToManyField(User, related_name='conversations')
     
-    # null=True та blank=True дозволяють створювати чати БЕЗ товару
     product = models.ForeignKey(
-        'Product', # Використовуємо рядок, якщо модель Product нижче або в іншому файлі
+        'Product', 
         on_delete=models.SET_NULL, 
         null=True, 
         blank=True,
@@ -138,16 +132,9 @@ class Conversation(models.Model):
         if self.type == 'group':
             return f"Dormitory №{self.dormitory_number}"
         
-        # Для приватних чатів виводимо список учасників
         usernames = ", ".join([u.username for u in self.participants.all()[:2]])
         return f"Private: {usernames}"
     def get_unread_count(self, user):
-        """
-        Рахує повідомлення, де:
-        1. Повідомлення належить цій бесіді.
-        2. Статус is_read = False.
-        3. Відправник — НЕ цей користувач.
-        """
         return self.messages.filter(is_read=False).exclude(sender=user).count()
 class Message(models.Model):
     conversation = models.ForeignKey(Conversation, on_delete=models.CASCADE, related_name='messages')
@@ -155,18 +142,17 @@ class Message(models.Model):
     text = models.TextField()
     is_read = models.BooleanField(default=False)
     
-    # Міняємо created_at на timestamp для зручності фронтенду (або залиш як є)
     created_at = models.DateTimeField(auto_now_add=True)
     is_flagged = models.BooleanField(default=False)
     class Meta:
-        ordering = ['created_at'] # Важливо, щоб повідомлення йшли по порядку
+        ordering = ['created_at'] 
 
 class ExchangeOffer(models.Model):
     STATUS_CHOICES = (('pending', 'Pending'), ('accepted', 'Accepted'), ('declined', 'Declined'))
     
     sender = models.ForeignKey(User, on_delete=models.CASCADE, related_name='sent_offers')
     receiver = models.ForeignKey(User, on_delete=models.CASCADE, related_name='received_offers')
-    offered_item_name = models.CharField(max_length=200) # Назва товару, який пропонують на заміну
+    offered_item_name = models.CharField(max_length=200)
     target_product = models.ForeignKey(Product, on_delete=models.CASCADE)
     status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='pending')
     created_at = models.DateTimeField(auto_now_add=True)
@@ -216,7 +202,6 @@ class Notification(models.Model):
     title = models.CharField(max_length=255)
     description = models.TextField()
     
-    # Ссилка на об'єкт (наприклад, ID товару або чату)
     target_id = models.CharField(max_length=255, null=True, blank=True)
     
     is_read = models.BooleanField(default=False)
@@ -254,18 +239,14 @@ class Report(models.Model):
     null=True,
     blank=True
     )
-    # Generic Foreign Key дозволяє посилатися на Product або Message
-    # Змініть це поле в моделі Report:
     content_type = models.ForeignKey(ContentType, on_delete=models.CASCADE, null=True, blank=True)
-    object_id = models.PositiveIntegerField(null=True, blank=True) # Додайте null=True і сюди про всяк випадок
+    object_id = models.PositiveIntegerField(null=True, blank=True) 
     content_object = GenericForeignKey('content_type', 'object_id')
     
     reason = models.CharField(max_length=20, choices=REASON_CHOICES)
     description = models.TextField(blank=True, null=True)
     
     status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='pending')
-    
-    # Хто розглянув скаргу (Admin або Doorkeeper)
     handled_by = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True, related_name='reports_handled')
     created_at = models.DateTimeField(auto_now_add=True)
 
@@ -273,7 +254,6 @@ class Report(models.Model):
         ordering = ['-created_at']
 
     def __str__(self):
-        # Використовуємо тернарний оператор для перевірки на None
         content_name = self.content_type.name if self.content_type else "Unknown Type"
         return f"Report by {self.reporter.username} on {content_name}"
     

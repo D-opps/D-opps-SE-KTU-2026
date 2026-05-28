@@ -5,7 +5,7 @@ import axios from 'axios';
 import { toast } from 'sonner';
 
 export function ItemDetails() {
-  const { itemId } = useParams(); // Отримуємо ID з URL (в твоїх роутах цеitemId)
+  const { itemId } = useParams(); 
   const navigate = useNavigate();
   const [item, setItem] = useState<any>(null);
   const [loading, setLoading] = useState(true);
@@ -43,7 +43,6 @@ export function ItemDetails() {
     fetchItem();
   }, [itemId]);
 
-  // ФУНКЦІЯ СКАРГИ
   const handleReport = () => {
     const token = localStorage.getItem('accessToken');
     if (!token) {
@@ -51,8 +50,6 @@ export function ItemDetails() {
       navigate('/login');
       return;
     }
-    // Переходимо на нашу нову сторінку скарги
-    // itemId беремо з useParams вище
     navigate(`/report/product/${itemId}`);
   };
 
@@ -60,14 +57,14 @@ export function ItemDetails() {
     const token = localStorage.getItem('accessToken');
     
     if (!token) {
-      toast.error("Будь ласка, увійдіть, щоб зв'язатися з продавцем");
+      toast.error("Please, log in to contact the seller");
       navigate('/login');
       return;
     }
 
     const sellerId = item.seller_id || item.seller;
     if (currentUserId === sellerId) {
-      toast.error("Це ваше власне оголошення!");
+      toast.error("this is your own listing!");
       return;
     }
 
@@ -92,12 +89,12 @@ export function ItemDetails() {
             headers: { Authorization: `Bearer ${token}` }
           });
         } catch (msgErr) {
-          console.error("Повідомлення не надіслано, але чат створено");
+          console.error("Message not sent, but chat created:", msgErr);
         }
       }
     } catch (err: any) {
       console.error("Full error data:", err.response?.data);
-      toast.error(err.response?.data?.error || "Не вдалося почати чат");
+      toast.error(err.response?.data?.error || "Cannot start chat");
     }
   };
 
@@ -138,7 +135,6 @@ export function ItemDetails() {
 
         <div className="bg-white rounded-[2.5rem] p-8 shadow-sm border border-gray-100 flex flex-col justify-between">
           <div>
-            {/* БЛОК КАТЕГОРІЇ ТА СТАНУ */}
             <div className="flex items-center gap-2 mb-4">
               <span className="px-3 py-1 bg-blue-50 text-blue-600 text-xs font-bold uppercase tracking-widest rounded-full border border-blue-100">
                 {item.category_display || item.category || 'Other'}
@@ -204,69 +200,3 @@ export function ItemDetails() {
     </div>
   );
 }
-//   return (
-//     <div className="p-4 lg:p-8 max-w-7xl mx-auto">
-//       <Link to="/marketplace" className="flex items-center gap-2 text-gray-600 hover:text-gray-900 mb-6 transition-colors w-fit">
-//         <ArrowLeft className="w-5 h-5" /> <span className="font-medium">Back to Marketplace</span>
-//       </Link>
-
-//       <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-//         <div className="bg-white rounded-[2.5rem] overflow-hidden shadow-sm border border-gray-100 h-fit">
-//           <img 
-//             src={item.image?.startsWith('http') ? item.image : `${BASE_URL}${item.image}`} 
-//             className="w-full h-auto max-h-[600px] object-cover" 
-//             alt={item.title}
-//           />
-//         </div>
-
-//         <div className="bg-white rounded-[2.5rem] p-8 shadow-sm border border-gray-100 flex flex-col justify-between">
-//           <div>
-//             <div className="flex justify-between items-start mb-2">
-//               <h1 className="text-4xl font-bold text-gray-900">{item.title}</h1>
-//               {/* Кнопка прапорця тепер викликає handleReport */}
-//               {!isOwner && (
-//                 <button 
-//                   onClick={handleReport}
-//                   className="p-3 text-gray-400 hover:text-red-500 hover:bg-red-50 transition-all rounded-full border border-transparent hover:border-red-100"
-//                   title="Поскаржитися"
-//                 >
-//                   <Flag size={24} />
-//                 </button>
-//               )}
-//             </div>
-            
-//             <div className="text-3xl font-black text-blue-600 mb-6">${item.price}</div>
-//             <p className="text-gray-600 leading-relaxed whitespace-pre-line mb-8">{item.description}</p>
-//           </div>
-
-//           <div className="pt-6 border-t border-gray-100">
-//             <div className="flex items-center gap-4 mb-8">
-//               <div className="w-14 h-14 bg-blue-600 rounded-2xl flex items-center justify-center font-bold text-white text-xl uppercase">
-//                 {item.seller_name?.[0] || 'U'}
-//               </div>
-//               <div>
-//                 <p className="text-xs text-gray-400 font-bold uppercase tracking-widest">Seller</p>
-//                 <p className="text-lg font-bold text-gray-900">{item.seller_name || "Dorm Resident"}</p>
-//               </div>
-//             </div>
-
-//             {isOwner ? (
-//               <div className="p-4 bg-gray-50 rounded-2xl text-gray-500 italic flex items-center gap-3">
-//                 <AlertCircle size={20} /> <span>You cannot contact yourself.</span>
-//               </div>
-//             ) : (
-//               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-//                 <button onClick={handleContactSeller} className="flex items-center justify-center gap-2 px-6 py-4 bg-gray-900 text-white rounded-2xl hover:bg-black font-bold shadow-lg transition-transform active:scale-95">
-//                   <ChatIcon size={20} /> Contact Seller
-//                 </button>
-//                 <button onClick={handleProposeExchange} className="flex items-center justify-center gap-2 px-6 py-4 bg-white text-gray-900 border-2 border-gray-900 rounded-2xl hover:bg-gray-50 font-bold transition-transform active:scale-95">
-//                   <TagIcon size={20} /> Propose Exchange
-//                 </button>
-//               </div>
-//             )}
-//           </div>
-//         </div>
-//       </div>
-//     </div>
-//   );
-// }

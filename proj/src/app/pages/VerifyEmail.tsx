@@ -11,11 +11,10 @@ export function VerifyEmail() {
   const [message, setMessage] = useState('');
   const [resending, setResending] = useState(false);
 
-  // Отримуємо токен з URL (наприклад: /verify-email?token=...&email=...)
   const token = searchParams.get('token');
   const emailParam = searchParams.get('email');
   
-  const BASE_URL = 'http://172.20.10.3:8000'; // Твій новий IP
+  const BASE_URL = 'http://172.20.10.3:8000'; 
 
   useEffect(() => {
     if (token) {
@@ -28,7 +27,6 @@ export function VerifyEmail() {
 
   const verifyEmail = async () => {
     try {
-      // Відправляємо токен на твій Django бекенд
       const res = await axios.get(`${BASE_URL}/api/verify-email/`, {
         params: { token: token }
       });

@@ -16,12 +16,11 @@ export function ForgotPassword() {
     setLoading(true);
 
     try {
-      // Переконайся, що в Django urls.py цей шлях саме такий
       await axios.post('http://127.0.0.1:8000/api/password_reset/', 
   { email: email },
   {
     headers: {
-      'Accept-Language': 'en', // Це підкаже Django відправляти лист англійською
+      'Accept-Language': 'en', 
     }
   }
 );
@@ -30,7 +29,6 @@ export function ForgotPassword() {
       toast.success('Reset instructions sent to your email');
     } catch (err: any) {
       console.error('Reset error:', err);
-      // Django зазвичай повертає помилку в полі detail або email
       const msg = err.response?.data?.detail || err.response?.data?.email?.[0] || 'Email not found.';
       setError(msg);
       toast.error('Failed to send reset link');

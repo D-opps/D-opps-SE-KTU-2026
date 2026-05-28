@@ -9,7 +9,6 @@ from django.db.models.signals import post_save
 
 @receiver(reset_password_token_created)
 def password_reset_token_created(sender, instance, reset_password_token, *args, **kwargs):
-    # Посилання має вести на порт 5173 (React)
     reset_url = f"http://localhost:5173/reset-password/{reset_password_token.key}"
 
     email_plaintext_message = f"Hello! Use this token to reset your password: {reset_url}"
@@ -23,10 +22,8 @@ def password_reset_token_created(sender, instance, reset_password_token, *args, 
 
 @receiver(post_save, sender=Message)
 def send_email_notification(sender, instance, created, **kwargs):
-    # Перевіряємо, чи це саме створення нового запису (а не оновлення старого)
     if created:
         conversation = instance.conversation
-        # Отримуємо всіх учасників, крім того, хто відправив
         recipients = conversation.participants.exclude(id=instance.sender.id)
 
         for recipient in recipients:
@@ -42,24 +39,13 @@ def send_email_notification(sender, instance, created, **kwargs):
                     fail_silently=True,
                 )
 
-# @receiver(post_save, sender=Message)
-# def create_message_notification(sender, instance, created, **kwargs):
-#     if created:  # Якщо це нове повідомлення, а не редагування старого
-#         Notification.objects.create(
-#             user=instance.receiver,  # Кому прийде сповіщення
-#             text=f"You received a new message from {instance.sender.username}",
-#             link=f"/chat/{instance.sender.id}" # Куди клікнути
-#         )
 
 @receiver(post_save, sender=Message)
 def create_notification_on_message(sender, instance, created, **kwargs):
-    # Працюємо тільки якщо створено нове повідомлення
     if created:
-        # Отримуємо всіх учасників чату
         participants = instance.conversation.participants.all()
         
         for participant in participants:
-            # Не надсилаємо сповіщення самому собі (відправнику)
             if participant != instance.sender:
                 Notification.objects.create(
                     user=participant,
@@ -74,7 +60,7 @@ def create_notification_on_message(sender, instance, created, **kwargs):
 def create_notification_on_offer(sender, instance, created, **kwargs):
     if created:
         Notification.objects.create(
-            user=instance.item.owner, # Отримувач — власник товару
+            user=instance.item.owner, 
             notification_type='offer',
             title="New Exchange Offer!",
             description=f"User {instance.sender.username} wants to exchange items.",
@@ -84,7 +70,6 @@ def create_notification_on_offer(sender, instance, created, **kwargs):
 @receiver(post_save, sender=Event)
 def create_notification_on_event(sender, instance, created, **kwargs):
     if created:
-        # Отримуємо всіх користувачів, крім того, хто створив івент
         users = User.objects.exclude(id=instance.creator.id)
         
         notifications = []
@@ -93,7 +78,7 @@ def create_notification_on_event(sender, instance, created, **kwargs):
                 Notification(
                     user=user,
                     notification_type='event',
-                    title=f"New Event: {instance.title}", # ВИПРАВЛЕНО: instance.title замість instance.name
+                    title=f"New Event: {instance.title}", 
                     description=f"We invite you to join {instance.title} on {instance.date.strftime('%d.%m')}.", 
                     target_id=str(instance.id)
                 )

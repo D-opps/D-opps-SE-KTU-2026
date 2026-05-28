@@ -11,7 +11,6 @@ const ReportPage: React.FC = () => {
     const [description, setDescription] = useState('');
     const [loading, setLoading] = useState(false);
 
-// Report.tsx
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
         setLoading(true);
@@ -19,9 +18,8 @@ const ReportPage: React.FC = () => {
         try {
             const token = localStorage.getItem('accessToken');
             
-            // Шлемо на базовий URL в'юсета без /create/
             await axios.post('http://127.0.0.1:8000/api/reports/', {
-                model_name: type, // 'product' або 'user'
+                model_name: type, 
                 object_id: id,
                 reason: reason,
                 description: description,
@@ -33,7 +31,6 @@ const ReportPage: React.FC = () => {
             navigate(-1);
         } catch (error: any) {
             console.error('Помилка:', error.response?.data);
-            // Тепер ти побачиш нормальну помилку, якщо щось не так
             alert("Помилка: " + JSON.stringify(error.response?.data));
         } finally {
             setLoading(false);
@@ -43,14 +40,12 @@ const ReportPage: React.FC = () => {
     return (
         <div className="flex min-h-screen bg-gray-50 items-center justify-center p-4">
             <div className="max-w-xl w-full bg-white rounded-3xl shadow-2xl overflow-hidden border border-gray-100">
-                {/* Header з градієнтом */}
                 <div className="bg-gradient-to-br from-red-500 to-pink-600 p-8 text-white">
                     <h2 className="text-2xl font-bold">Complain?</h2>
                     <p className="text-red-100 mt-2">Are you going to complain about {type === 'product' ? 'this product' : 'this user'}?</p>
                 </div>
 
                 <form onSubmit={handleSubmit} className="p-8 space-y-6">
-                    {/* Вибір причини */}
                     <div>
                         <label className="block text-gray-700 font-bold mb-3">What's the issue?</label>
                         <div className="space-y-3">
@@ -76,7 +71,6 @@ const ReportPage: React.FC = () => {
                         </div>
                     </div>
 
-                    {/* Поле опису */}
                     <div>
                         <label className="block text-gray-700 font-bold mb-3">Add more details</label>
                         <textarea 
@@ -87,7 +81,6 @@ const ReportPage: React.FC = () => {
                         />
                     </div>
 
-                    {/* Кнопки */}
                     <div className="flex flex-col gap-3 pt-4">
                         <button 
                             type="submit" 

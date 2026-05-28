@@ -66,7 +66,6 @@ export function Dashboard() {
     try {
       const headers = { 'Authorization': `Bearer ${token}` };
 
-      // Запити до твого Django API
       const [metricsRes, machinesRes, messagesRes, profileRes] = await Promise.all([
         fetch(`http://127.0.0.1:8000/api/admin/metrics/?period=${metricsPeriod}`, { headers }),
         fetch(`http://127.0.0.1:8000/api/machines/`, { headers }),
@@ -87,7 +86,6 @@ export function Dashboard() {
       if (machinesRes.ok) setMachines(await machinesRes.json());
       if (messagesRes.ok) setMessages(await messagesRes.json());
       
-      // СИНХРОНІЗАЦІЯ РОЛІ КОРИСТУВАЧА
       if (profileRes.ok) {
         const profileData = await profileRes.json();
         const realRole = profileData.profile.role;
@@ -107,7 +105,6 @@ export function Dashboard() {
     }
   };
 
-  // Показуємо індикатор завантаження, якщо дані ще не отримані
   if (loading && !metrics) {
     return (
       <div className="h-screen flex items-center justify-center">
@@ -116,13 +113,11 @@ export function Dashboard() {
     );
   }
 
-  // Обчислення кількості вільних машинок
   const availableMachinesCount = machines.filter((m) => m.status === 'free').length;
 
   return (
     <div className="p-4 lg:p-8 max-w-7xl mx-auto space-y-8">
       
-      {/* HEADER BANNER */}
       <div className="relative overflow-hidden bg-gradient-to-r from-blue-600 to-indigo-700 rounded-3xl p-8 text-white shadow-xl">
         <div className="relative z-10">
           <span className="px-3 py-1 bg-white/20 backdrop-blur-md rounded-full text-xs font-bold uppercase tracking-wider">
@@ -134,7 +129,6 @@ export function Dashboard() {
         <Zap className="absolute right-[-20px] bottom-[-20px] w-64 h-64 text-white/10 rotate-12" />
       </div>
 
-      {/* ADMIN ANALYTICS - Відображається лише якщо роль користувача 'admin' */}
       {userRole === 'admin' && (
         <section className="space-y-4">
           <div className="flex items-center justify-between">
@@ -182,13 +176,11 @@ export function Dashboard() {
         </section>
       )}
 
-      {/* QUICK ACTIONS */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
         <DashboardCard to="/laundry" title="Laundry Room" value={`${availableMachinesCount} Free`} desc="Check machines availability" icon={<WashingMachine />} color="bg-emerald-50 text-emerald-600" />
         <DashboardCard to="/chat" title="Community Chat" value="Active" desc="Talk with neighbors" icon={<ChatIcon />} color="bg-purple-50 text-purple-600" />
       </div>
 
-      {/* RECENT MESSAGES FEED */}
       <div className="bg-white rounded-3xl p-8 shadow-sm border border-gray-100">
         <h2 className="text-xl font-black mb-6">Community Buzz</h2>
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
@@ -212,7 +204,6 @@ export function Dashboard() {
   );
 }
 
-// --- Компоненти-помічники для карток метрик та навігації ---
 function MetricCard({ title, value, sub, label, icon, color }: MetricCardProps) {
   const colors = {
     blue: "text-blue-600 bg-blue-50",

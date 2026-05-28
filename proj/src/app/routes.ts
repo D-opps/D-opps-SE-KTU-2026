@@ -14,8 +14,10 @@ import { Events } from "./pages/Events";
 import { Notifications } from "./pages/Notifications";
 import ReportPage from "./pages/Report";
 import ReportDashboard from "./pages/ReportDashboard";
-import { VerifyEmail } from "./pages/VerifyEmail"; // Це очікує 'export const VerifyEmail'// 1. ІМПОРТУЙ ТУТ СВОЮ СТОРІНКУ АНАЛІТИКИ
+import { VerifyEmail } from "./pages/VerifyEmail"; 
 import { AnalyticsDashboard } from "./pages/AnalyticsDashboard"; 
+import { Tutorial } from "./pages/Tutorial";
+import { WelcomeHandler } from "./pages/WelcomeHandler";
 
 export const router = createBrowserRouter([
   {
@@ -39,10 +41,15 @@ export const router = createBrowserRouter([
     Component: ResetPassword,
   },
   {
+    path: "/tutorial", 
+    Component: Tutorial,
+  },
+  {
     path: "/",
     Component: Layout,
     children: [
-      { index: true, Component: Dashboard },
+      { index: true, Component: WelcomeHandler },
+      { path: "dashboard", Component: Dashboard },
       { path: "laundry", Component: Laundry },
       { path: "marketplace", Component: Marketplace },
       { path: "marketplace/:itemId", Component: ItemDetails },
@@ -53,7 +60,6 @@ export const router = createBrowserRouter([
       { path: "notifications", Component: Notifications },
       { path: "report/:type/:id", Component: ReportPage },
       { path: "admin/reports", Component: ReportDashboard },
-      // 2. ДОДАЙ ЦЕЙ ШЛЯХ ТУТ
       { path: "admin/analytics", Component: AnalyticsDashboard },
     ],
   },

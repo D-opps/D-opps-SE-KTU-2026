@@ -19,7 +19,6 @@ type MarketplaceItem = {
   is_used: boolean;
 };
 
-// Текстові назви для створення (точно як у вашій базі: "Electronics", "Furniture"...)
 const DB_CATEGORIES = [
   { id: 'electronics', name: 'Electronics' },
   { id: 'furniture', name: 'Furniture' },
@@ -48,7 +47,7 @@ export function Marketplace() {
   const [form, setForm] = useState({
     name: '',
     price: '',
-    category: 'electronics', // Рядок з великої літери за замовчуванням
+    category: 'electronics', 
     description: '',
     is_used: false,
   });
@@ -66,7 +65,6 @@ export function Marketplace() {
 
       const data = res.data.results || res.data;
 
-      // Переконуємося, що дані мапляться без помилок типів
       const formatted: MarketplaceItem[] = Array.isArray(data) ? data.map((item: any) => ({
         id: item.id.toString(),
         seller_id: item.seller_id?.toString(),
@@ -150,7 +148,6 @@ export function Marketplace() {
     formData.append('price', form.price);
     const cleanCategory = form.category.replace(/^["']|["']$/g, '').trim();
     formData.append('category', cleanCategory);
-    //formData.append('category', form.category); // Передаємо чистий рядок 'Electronics'
     formData.append('description', form.description);
     formData.append('is_used', String(form.is_used));
 
@@ -182,7 +179,6 @@ export function Marketplace() {
     } catch (err: any) {
       console.error('Server response error:', err.response?.data);
       
-      // Якщо сервер повернув конкретну помилку валідації полів, покажемо її в toast
       if (err.response?.data) {
         const errors = Object.entries(err.response.data)
           .map(([key, value]) => `${key}: ${Array.isArray(value) ? value.join(', ') : value}`)
@@ -197,7 +193,6 @@ export function Marketplace() {
   return (
     <div className="p-6 max-w-7xl mx-auto">
 
-      {/* HEADER */}
       <div className="flex justify-between mb-6">
         <h1 className="text-3xl font-black">Marketplace</h1>
 
@@ -209,7 +204,6 @@ export function Marketplace() {
         </button>
       </div>
 
-      {/* SEARCH */}
       <div className="flex gap-2 mb-6">
         <input
           className="flex-1 p-3 bg-gray-100 rounded-xl"
@@ -226,7 +220,6 @@ export function Marketplace() {
         </button>
       </div>
 
-      {/* FILTERS */}
       {showFilters && (
         <div className="flex gap-2 mb-6 flex-wrap">
           {FILTER_CATEGORIES.map(c => (
@@ -243,7 +236,6 @@ export function Marketplace() {
         </div>
       )}
 
-      {/* LIST */}
       {loading ? (
         <div className="flex justify-center p-12">
           <Loader2 className="animate-spin text-blue-600" size={32} />
@@ -282,7 +274,6 @@ export function Marketplace() {
         </>
       )}
 
-      {/* MODAL */}
       {isModalOpen && (
         <div className="fixed inset-0 bg-black/40 flex items-center justify-center p-4 z-50 animate-fade-in">
           <form onSubmit={handleSubmit} className="bg-white w-[420px] p-6 rounded-2xl space-y-4 shadow-xl">
@@ -311,7 +302,6 @@ export function Marketplace() {
               required
             />
 
-            {/* СЕЛЕКТ КАТЕГОРІЙ */}
             <div className="flex flex-col gap-1">
               <label className="text-xs text-gray-500 pl-1">Select Category</label>
               <select
@@ -335,7 +325,6 @@ export function Marketplace() {
               required
             />
 
-            {/* USED TOGGLE */}
             <label className="flex items-center gap-2 cursor-pointer select-none text-sm text-gray-700">
               <input
                 type="checkbox"
@@ -346,7 +335,6 @@ export function Marketplace() {
               This is a used item
             </label>
 
-            {/* IMAGE UPLOAD */}
             <div className="border-2 border-dashed p-4 rounded-xl text-center border-gray-300 hover:border-blue-500 transition">
               <input
                 ref={fileInputRef}

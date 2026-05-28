@@ -10,17 +10,14 @@ DASHBOARD_URL = "http://localhost:5173/admin/reports"
 
 @pytest.fixture(scope="function")
 def admin_authorized_driver():
-    """Initializes the browser, enables console log collection, and adds authorization"""
     options = webdriver.ChromeOptions()
     options.add_argument("--headless=new")
     options.add_argument("--no-sandbox")
     options.add_argument("--disable-dev-shm-usage")
-    # Enable browser log collection for debugging
     options.set_capability('goog:loggingPrefs', {'browser': 'ALL'})
     
     driver = webdriver.Chrome(options=options)
     
-    # Authorize through the base URL
     driver.get("http://localhost:5173/")
     driver.execute_script("localStorage.setItem('accessToken', 'mock-admin-secure-token-111');")
     
@@ -45,7 +42,6 @@ def test_report_dashboard_lifecycle(admin_authorized_driver):
     ]
 
     print("\n[STEP 1] Registering a persistent interceptor through CDP before the page loads...")
-    # This script will be executed FIRST by Chrome, even before parsing your React/Vite code
     mock_api_script = f"""
     (function() {{
         // Write mocks to sessionStorage if they are not there yet
@@ -82,7 +78,6 @@ def test_report_dashboard_lifecycle(admin_authorized_driver):
     }})();
     """
     
-    # Inject the mock at the Chrome engine level
     driver.execute_cdp_cmd("Page.addScriptToEvaluateOnNewDocument", {"source": mock_api_script})
 
     print("[STEP 2] Direct navigation to the Dashboard page...")
@@ -90,23 +85,18 @@ def test_report_dashboard_lifecycle(admin_authorized_driver):
 
     print("[STEP 3] Waiting for interface elements with full debugging in case of an error...")
     try:
-        # Wait for the main page heading
         wait.until(EC.visibility_of_element_located((By.XPATH, "//h1[contains(., 'Reports Management')]")))
     except Exception as e:
-        # ======= DEEP ENVIRONMENT DIAGNOSTICS BLOCK =======
         print("\n THE BROWSER IS STUCK! COLLECTING DIAGNOSTIC DATA:")
         print(f"Current URL in Chrome: {driver.current_url}")
         
-        # 1. Save a screenshot of the screen to see whether it is a blank page or a 404 error
         driver.save_screenshot("dashboard_fatal_debug.png")
         print(" Screenshot saved to file: dashboard_fatal_debug.png")
         
-        # 2. Output errors from the browser console, for example, a chunk failed to load or a JS error occurred
         print("\n BROWSER CONSOLE LOGS (JS ERRORS):")
         for log in driver.get_log('browser'):
             print(f"   [{log['level']}] {log['message']}")
             
-        # 3. Output the HTML code currently visible to Selenium
         print("\n PAGE HTML STRUCTURE (FIRST 500 CHARACTERS):")
         print(driver.page_source[:500])
         raise e

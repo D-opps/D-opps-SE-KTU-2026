@@ -14,7 +14,6 @@ def test_profile_and_listings_lifecycle(logged_in_driver):
     print("\n[STEP 1] Initial page opening to set up authorization...")
     driver.get(PROFILE_URL)
     
-    # Write the authorization token so the application does not redirect to /login
     driver.execute_script("localStorage.setItem('accessToken', 'mock-profile-token-999');")
 
     print("[STEP 2] Setting up network mocking through the debugging protocol without an f-string...")
@@ -38,7 +37,6 @@ def test_profile_and_listings_lifecycle(logged_in_driver):
         ]
     }
 
-    # Clean JS template without unsafe Python f-strings
     js_template = """
     (function() {
         const mockData = MOCK_DATA_PLACEHOLDER;
@@ -66,10 +64,8 @@ def test_profile_and_listings_lifecycle(logged_in_driver):
     })();
     """
     
-    # Safely insert the generated JSON instead of the placeholder
     stable_mock_js = js_template.replace("MOCK_DATA_PLACEHOLDER", json.dumps(mock_response))
     
-    # Register the script in Chrome
     driver.execute_cdp_cmd("Page.addScriptToEvaluateOnNewDocument", {
         "source": stable_mock_js
     })
@@ -78,7 +74,6 @@ def test_profile_and_listings_lifecycle(logged_in_driver):
     driver.get(PROFILE_URL)
     wait.until(lambda d: d.execute_script("return document.readyState") == "complete")
     
-    # Wait for React to execute the request
     time.sleep(2.5)
 
     print("[STEP 4] Checking the display of profile data...")
@@ -112,20 +107,15 @@ def test_profile_and_listings_lifecycle(logged_in_driver):
     product_container_xpath = f"{product_card_xpath}/ancestor::div[contains(@class, 'group')]"
     trash_btn = driver.find_element(By.XPATH, f"{product_container_xpath}//button")
     
-    # Force the button to be visible
     driver.execute_script("arguments[0].style.opacity = '1'; arguments[0].style.display = 'block';", trash_btn)
     time.sleep(0.5)
     
-    # RELIABLE CLICK: Use a JS click instead of a regular trash_btn.click()
-    # This completely solves the ElementClickInterceptedException problem
     driver.execute_script("arguments[0].click();", trash_btn)
     time.sleep(0.5)
     
-    # Click OK in the window.confirm confirmation dialog
     alert = driver.switch_to.alert
     alert.accept()
     
-    # Wait until the card disappears from the DOM
     wait.until(EC.staleness_of(product_card))
     assert driver.find_element(By.XPATH, "//p[contains(text(), 'No listings yet')]").is_displayed()
     print("  -> The product was deleted successfully.")
