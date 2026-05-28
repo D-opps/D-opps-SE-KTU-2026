@@ -47,6 +47,7 @@ def search_user_by_email(request):
 def get_me(request):
     serializer = UserSerializer(request.user)
     return Response(serializer.data)
+
 class MachineViewSet(viewsets.ModelViewSet):
     serializer_class = MachineSerializer
     permission_classes = [permissions.IsAuthenticated] 
@@ -54,11 +55,17 @@ class MachineViewSet(viewsets.ModelViewSet):
     def get_queryset(self):
         user = self.request.user
         from django.utils import timezone
+        
+        # Automatically release expired machines
         Machine.objects.filter(
             status='occupied', 
             end_time__lte=timezone.now()
         ).update(status='free', end_time=None)
 
+        # Guard clause in case the user does not have an assigned dormitory
+        if not user.dormitory:
+            return Machine.objects.none()
+            
         return Machine.objects.filter(dormitory=user.dormitory)
     
     def perform_create(self, serializer):
@@ -77,13 +84,14 @@ class MachineViewSet(viewsets.ModelViewSet):
         if new_status not in valid_statuses:
             return Response({'error': 'Invalid status'}, status=status.HTTP_400_BAD_REQUEST)
 
+        old_status = machine.status
         machine.status = new_status
         machine.notes = notes
         machine.reported_by = request.user
         machine.last_reported_at = timezone.now()
         
         if new_status == 'occupied':
-            machine.occupied_by = user_name if user_name else "Користувач"
+            machine.occupied_by = user_name if user_name else "User"
             try:
                 minutes = int(request.data.get('minutes', 30))
             except (ValueError, TypeError):
@@ -94,6 +102,37 @@ class MachineViewSet(viewsets.ModelViewSet):
             machine.end_time = None
             machine.notes = ''
             machine.occupied_by = '' 
+
+        # Logic handled when a machine breaks down
+        elif new_status == 'out-of-order' and old_status != 'out-of-order':
+            from django.contrib.contenttypes.models import ContentType
+            
+            # 1. Automatically generate an official system issue report
+            machine_type = ContentType.objects.get_for_model(Machine)
+            report = Report.objects.create(
+                reporter=request.user,
+                reason="broken_hardware",
+                description=f"Machine '{machine.name}' (Location: {machine.location}) went out of order. Details: {notes}",
+                content_type=machine_type,
+                object_id=machine.id,
+                status='pending'
+            )
+
+            # 2. Query for admins and doorkeepers tied to this specific dormitory
+            dorm_admins = User.objects.filter(
+                role__in=['admin', 'doorkeeper'],
+                dormitory=request.user.dormitory
+            )
+            
+            # 3. Dispatched individual system notifications
+            for admin in dorm_admins:
+                Notification.objects.create(
+                    user=admin,
+                    notification_type='system',
+                    title='⚠️ Laundry Machine Broken!',
+                    description=f"Machine '{machine.name}' in Dorm #{request.user.dormitory} has been flagged as out of order. Report #{report.id} was auto-generated.",
+                    target_id=str(report.id) # Linking directly to the generated Report ID
+                )
 
         machine.save()
         
@@ -616,7 +655,7 @@ class ReportViewSet(viewsets.ModelViewSet):
                 user=report.reporter,
                 notification_type='system',
                 title='Report resolved',
-                description='User has been warned.',
+                description='Actions were taken regarding your report.',
             )
 
             if reported_user:

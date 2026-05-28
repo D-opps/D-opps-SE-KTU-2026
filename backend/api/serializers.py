@@ -59,6 +59,8 @@ class ReportSerializer(serializers.ModelSerializer):
         return super().create(validated_data)
     
 class MachineSerializer(serializers.ModelSerializer):
+    reported_by_name = serializers.ReadOnlyField(source='reported_by.first_name')
+    reported_by_email = serializers.ReadOnlyField(source='reported_by.email')
     class Meta:
         model = Machine
         fields = [
@@ -71,10 +73,12 @@ class MachineSerializer(serializers.ModelSerializer):
             'location',
             'notes',
             'reported_by',
+            'reported_by_name',
+            'reported_by_email',
             'occupied_by',
             'end_time'
         ]
-        read_only_fields = ['dormitory']
+        read_only_fields = ['dormitory', 'reported_by']
         
 class ProductPhotoSerializer(serializers.ModelSerializer):
     class Meta:
