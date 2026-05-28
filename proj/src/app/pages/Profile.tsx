@@ -96,8 +96,6 @@ export function Profile() {
     e.preventDefault();
     e.stopPropagation();
 
-    if (!window.confirm("Are you sure you want to delete this listing?")) return;
-
     try {
       const token = localStorage.getItem('accessToken');
       await axios.delete(`${BASE_URL}/api/products/${id}/`, {

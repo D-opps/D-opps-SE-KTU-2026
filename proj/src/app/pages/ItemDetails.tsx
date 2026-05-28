@@ -152,7 +152,7 @@ export function ItemDetails() {
                 <button 
                   onClick={handleReport}
                   className="p-3 text-gray-400 hover:text-red-500 hover:bg-red-50 transition-all rounded-full border border-transparent hover:border-red-100"
-                  title="Поскаржитися"
+                  title="Complain"
                 >
                   <Flag size={24} />
                 </button>
