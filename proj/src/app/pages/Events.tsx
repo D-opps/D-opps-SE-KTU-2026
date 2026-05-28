@@ -40,7 +40,6 @@ export function Events() {
     });
   };
 
-  // ---------------- LOAD ----------------
   const loadEvents = async () => {
     setLoading(true);
 
@@ -62,7 +61,6 @@ export function Events() {
     }
   };
 
-  // ---------------- CREATE ----------------
   const createEvent = async (e: React.FormEvent) => {
     e.preventDefault();
 
@@ -101,7 +99,6 @@ export function Events() {
     }
   };
 
-  // ---------------- RSVP ----------------
   const rsvp = async (id: string) => {
     try {
       const res = await fetch(`${API_URL}${id}/rsvp/`, {
@@ -125,7 +122,6 @@ export function Events() {
     }
   };
 
-  // ---------------- DELETE ----------------
   const deleteEvent = async (id: string) => {
     try {
       const res = await fetch(`${API_URL}${id}/`, {
@@ -148,11 +144,9 @@ export function Events() {
     loadEvents();
   }, []);
 
-  // ---------------- UI ----------------
   return (
     <div className="min-h-screen bg-blue-50 p-6 max-w-6xl mx-auto">
 
-      {/* HEADER */}
       <div className="flex justify-between items-start mb-6">
         <div>
           <h1 className="text-3xl font-bold text-blue-900">
@@ -172,7 +166,6 @@ export function Events() {
         </button>
       </div>
 
-      {/* LOADING */}
       {loading ? (
         <p className="text-blue-600">Loading...</p>
       ) : events.length === 0 ? (
@@ -195,7 +188,6 @@ export function Events() {
                 </p>
               )}
 
-              {/* TIME BLOCK */}
               <div className="mt-4 text-sm text-gray-700 space-y-1">
 
                 <div className="flex gap-2 items-center">
@@ -221,7 +213,6 @@ export function Events() {
                 </div>
               </div>
 
-              {/* ACTIONS */}
               <div className="mt-4 flex gap-2">
 
                 <button
@@ -244,7 +235,6 @@ export function Events() {
         </div>
       )}
 
-      {/* MODAL */}
       {showModal && (
         <div className="fixed inset-0 bg-black/40 flex items-center justify-center">
 

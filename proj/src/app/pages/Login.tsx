@@ -8,7 +8,7 @@ import { useGoogleLogin } from '@react-oauth/google';
 
 export function Login() {
   const navigate = useNavigate();
-  const { updateRole } = useUser(); // Отримуємо функцію оновлення
+  const { updateRole } = useUser(); 
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
@@ -20,7 +20,7 @@ export function Login() {
     localStorage.setItem('userId', user.id); 
     localStorage.setItem('userEmail', user.email);
     localStorage.setItem('userName', user.full_name || 'User');
-    updateRole(user.role || 'student'); // Використовуємо контекст замість простого localStorage
+    updateRole(user.role || 'student'); 
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -39,7 +39,6 @@ export function Login() {
         localStorage.setItem('accessToken', access);
         localStorage.setItem('refreshToken', refresh);
 
-        // Отримуємо дані про юзера
         try {
           const userResponse = await axios.get('http://127.0.0.1:8000/api/users/me/', {
             headers: { 'Authorization': `Bearer ${access}` }
@@ -48,13 +47,13 @@ export function Login() {
           const userData = userResponse.data;
           localStorage.setItem('userId', userData.id); 
           localStorage.setItem('userName', userData.full_name || email.split('@')[0]);
+          localStorage.setItem("token", response.data.access);
           
-          // ЦЕ КЛЮЧОВИЙ МОМЕНТ:
           updateRole(userData.role || 'student'); 
           
         } catch (userErr) {
           console.error("Profile fetch failed");
-          updateRole('student'); // фолбек
+          updateRole('student'); 
         }
 
         toast.success('Welcome back!');
@@ -81,7 +80,6 @@ export function Login() {
         toast.success('Welcome back!');
         navigate('/');
       } catch (err: any) {
-        // ЦЕ ТЕ, ЩО ТРЕБА ДОДАТИ ЗАРАЗ:
         if (err.response && err.response.status === 403) {
           toast.error('Account not found. Please register manually first!');
           setError('User not registered. Go to Register page.');

@@ -11,9 +11,8 @@ REGISTER_URL = "http://localhost:5173/register"
 
 @pytest.fixture(scope="function")
 def clean_driver():
-    """Creates a clean isolated browser specifically for registration"""
     options = webdriver.ChromeOptions()
-    options.add_argument("--headless=new")  # Can be removed if you want to see the browser
+    options.add_argument("--headless=new")  
     options.add_argument("--no-sandbox")
     options.add_argument("--disable-dev-shm-usage")
     

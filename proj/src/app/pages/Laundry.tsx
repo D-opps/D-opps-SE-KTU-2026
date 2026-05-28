@@ -49,7 +49,6 @@ export function Laundry() {
   const user = JSON.parse(localStorage.getItem('user') || '{}');
   const token = localStorage.getItem('accessToken');
 
-  // force rerender every second
   const [, setTick] = useState(0);
 
   useEffect(() => {
@@ -100,7 +99,6 @@ export function Laundry() {
         return;
       }
 
-      // LIMIT 200 MINUTES
       if (minutes > MAX_MINUTES) {
         toast.error(`Maximum ${MAX_MINUTES} minutes`);
         return;
@@ -139,7 +137,6 @@ export function Laundry() {
     }
   };
 
-  // ADMIN CREATE MACHINE
     const handleCreate = async () => {
   if (!newMachine.name.trim()) {
     toast.error('Enter machine name');
@@ -185,7 +182,6 @@ export function Laundry() {
   }
 };
 
-  // ADMIN DELETE MACHINE
   const handleDelete = async (id: number) => {
     try {
       const res = await fetch(
@@ -313,7 +309,6 @@ export function Laundry() {
       {renderMachineList('washer')}
       {renderMachineList('dryer')}
 
-      {/* MANAGE MODAL */}
       {selectedMachine && (
         <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-end sm:items-center justify-center p-4 z-50">
           <div className="bg-white w-full max-w-sm p-6 rounded-3xl">
@@ -384,7 +379,6 @@ export function Laundry() {
         </div>
       )}
 
-      {/* ADD MACHINE MODAL */}
       {isAddModalOpen && (
         <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-end sm:items-center justify-center p-4 z-50">
           <div className="bg-white w-full max-w-sm p-6 rounded-3xl">

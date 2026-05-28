@@ -73,27 +73,23 @@ export function Chat() {
     } catch (e) { toast.error("Помилка видалення"); }
   };
 
-  // Оновлена функція відправки повідомлень (Оптимістичний та швидкий UI)
   const sendMessage = async (e: any) => {
     e.preventDefault();
     const messageText = newMessage.trim();
     if (!messageText || !chatId) return;
 
-    // 1. МИТТЄВО очищаємо інпут, щоб юзер не чекав відповіді сервера
     setNewMessage('');
 
-    // 2. Створюємо тимчасове оптимістичне повідомлення для миттєвого рендеру
-    const temporaryId = Date.now(); // Тимчасовий id для списку
+    const temporaryId = Date.now(); 
     const optMessage = {
       id: temporaryId,
       sender: userId,
       sender_name: "Me",
       text: messageText,
       created_at: new Date().toISOString(),
-      isSending: true // прапорець для відображення статусу
+      isSending: true 
     };
 
-    // 3. Локально оновлюємо стейт поточного чату, щоб повідомлення з'явилося одразу
     setCurrentChat((prev: any) => {
       if (!prev) return prev;
       return {
@@ -103,17 +99,14 @@ export function Chat() {
     });
 
     try {
-      // 4. Відправляємо реальний запит на сервер паралельно у фоні
       await axios.post(`${BASE_URL}/api/messages/`, {
         conversation: chatId, text: messageText
       }, { headers: { Authorization: `Bearer ${token}` } });
       
-      // 5. Синхронізуємо дані з сервером після успішної відправки
       fetchChat();
       fetchConversations();
     } catch (e) { 
-      toast.error("Помилка відправки");
-      // Якщо сервер відвалився — видаляємо тимчасове повідомлення і повертаємо текст назад в інпут
+      toast.error("Error of sending");
       setNewMessage(messageText);
       setCurrentChat((prev: any) => {
         if (!prev || !prev.messages) return prev;
@@ -125,9 +118,8 @@ export function Chat() {
     }
   };
 
-  // Обробник натискання на дзвіночок сповіщень
   const handleBellClick = () => {
-    navigate('/notifications'); // Перенаправляє на сторінку сповіщень, яку ми лагодили
+    navigate('/notifications'); 
   };
 
   useEffect(() => {
@@ -146,7 +138,6 @@ export function Chat() {
     endRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [currentChat]);
 
-  // Сортування: спочатку закріплені
   const sortedConversations = [...conversations].sort((a, b) => {
     const aPinned = pinnedIds.includes(a.id) ? 1 : 0;
     const bPinned = pinnedIds.includes(b.id) ? 1 : 0;
@@ -156,12 +147,10 @@ export function Chat() {
   return (
     <div className="flex h-[calc(100vh-65px)] bg-[#F8FAFC] overflow-hidden font-sans text-gray-900">
       
-      {/* ЛІВА ПАНЕЛЬ */}
       <aside className="w-80 md:w-[400px] bg-white border-r border-gray-100 flex flex-col z-10 shadow-sm">
         
         <div className="p-5 border-b border-gray-50 flex justify-between items-center">
           <h1 className="text-xl font-black text-blue-600 tracking-tighter italic">MESSAGES</h1>
-          {/* Активний працюючий дзвіночок */}
           <Bell 
             onClick={handleBellClick} 
             className="text-gray-400 cursor-pointer hover:text-blue-500 transition-colors active:scale-90" 
@@ -169,7 +158,6 @@ export function Chat() {
           />
         </div>
 
-        {/* ПОШУК */}
         <div className="p-4 border-b border-gray-50 space-y-2">
            <div className="relative">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={16} />
@@ -201,7 +189,6 @@ export function Chat() {
            )}
         </div>
 
-        {/* СПЕЦ ЧАТИ */}
         <div className="p-4 grid grid-cols-2 gap-3 border-b border-gray-50">
           <button onClick={async () => {
              const exist = conversations.find(c => c.type === 'global');
@@ -225,7 +212,6 @@ export function Chat() {
           </button>
         </div>
 
-        {/* СПИСОК ЧАТІВ */}
         <div className="flex-1 overflow-y-auto custom-scrollbar p-2">
           {loading ? (
             <div className="flex justify-center mt-10 text-blue-500"><Loader2 className="animate-spin" /></div>
@@ -241,14 +227,12 @@ export function Chat() {
                   isActive ? 'bg-blue-50 shadow-sm border-l-4 border-blue-600 rounded-l-none' : 'hover:bg-gray-50 border border-transparent'
                 }`}
               >
-                {/* Аватарка */}
                 <div className={`w-12 h-12 rounded-full flex items-center justify-center flex-shrink-0 ${
                   c.type === 'global' ? 'bg-blue-100 text-blue-600' : c.type === 'dormitory' ? 'bg-purple-100 text-purple-600' : 'bg-gray-100 text-gray-500'
                 }`}>
                   {c.type === 'global' ? <Globe size={20} /> : c.type === 'dormitory' ? <Building2 size={20} /> : <User size={20} />}
                 </div>
                 
-                {/* Інфо */}
                 <div className="flex-1 min-w-0 pr-16">
                   <h3 className={`font-bold text-sm truncate ${isActive ? 'text-blue-700' : 'text-gray-900'}`}>
                     {c.display_name}
@@ -256,7 +240,6 @@ export function Chat() {
                   <p className="text-[11px] text-gray-400 truncate">Last message...</p>
                 </div>
 
-                {/* БЛОК КНОПОК */}
                 <div className="absolute right-2 flex items-center gap-1 bg-inherit">
                   <button
                     onClick={(e) => togglePin(e, c.id)}
@@ -275,7 +258,6 @@ export function Chat() {
                   </button>
                 </div>
 
-                {/* Непрочитані */}
                 {c.unread_count > 0 && !isActive && (
                   <span className="absolute top-2 right-2 bg-red-500 text-white text-[10px] px-1.5 py-0.5 rounded-full font-bold">
                     {c.unread_count}
@@ -287,7 +269,6 @@ export function Chat() {
         </div>
       </aside>
 
-      {/* ПРАВА ПАНЕЛЬ (ЧАТ) */}
       <main className="flex-1 flex flex-col bg-white">
         {!chatId ? (
           <div className="m-auto text-center space-y-4">
@@ -314,7 +295,6 @@ export function Chat() {
               <MoreVertical className="text-gray-400" />
             </header>
 
-            {/* ПОВІДОМЛЕННЯ */}
             <div className="flex-1 overflow-y-auto p-6 bg-[#FBFDFF] custom-scrollbar space-y-4">
               {currentChat?.messages?.map((m: any) => {
                 const isMe = String(m.sender) === String(userId);
@@ -331,9 +311,9 @@ export function Chat() {
                          </span>
                          {isMe && (
                            m.isSending ? (
-                             <Clock size={10} className="animate-pulse" /> // Годинник під час відправки
+                             <Clock size={10} className="animate-pulse" /> 
                            ) : (
-                             <CheckCheck size={10} /> // Пташечки, коли збережено
+                             <CheckCheck size={10} /> 
                            )
                          )}
                       </div>
@@ -344,7 +324,6 @@ export function Chat() {
               <div ref={endRef} />
             </div>
 
-            {/* ВВІД */}
             <footer className="p-4 border-t border-gray-100 bg-white">
               <form onSubmit={sendMessage} className="flex gap-2 bg-gray-50 p-2 rounded-2xl border border-gray-200 focus-within:border-blue-400 transition-all">
                 <input

@@ -37,12 +37,11 @@ export function Register() {
     const { name, value } = e.target;
     setFormData((prev) => ({ ...prev, [name]: value }));
     
-    // Якщо користувач почав змінювати поле, знімаємо з нього червоне підсвічування помилки
     if (errors[name] || (name === 'email' && errors['username'])) {
       setErrors((prev) => {
         const newErrs = { ...prev };
         delete newErrs[name];
-        delete newErrs['username']; // Також чистимо помилку юзернейму, бо вони пов'язані
+        delete newErrs['username']; 
         return newErrs;
       });
     }
@@ -89,11 +88,9 @@ export function Register() {
       const clientErrors: Record<string, string> = {};
 
       if (serverErrors) {
-        // 1. Пряма перевірка твого кастомного ключа "error" від Django
         if (serverErrors.error && typeof serverErrors.error === 'string') {
           const rawError = serverErrors.error;
           
-          // Якщо там написано про UNIQUE constraint для email
           if (rawError.includes('api_user.email') || rawError.includes('UNIQUE constraint')) {
             toast.error("User with this email already exists!");
             clientErrors.email = "This email is already taken";
@@ -101,7 +98,6 @@ export function Register() {
             toast.error(rawError);
           }
         } else {
-          // 2. Стандартний сканер на випадок, якщо прилетять інші помилки (наприклад, по паролю)
           Object.entries(serverErrors).forEach(([key, value]) => {
             const rawMessage = Array.isArray(value) ? value[0] : value;
             const msgString = String(rawMessage);
@@ -134,7 +130,6 @@ export function Register() {
           <h2 className="text-3xl font-bold text-gray-800 mb-6">Create Account</h2>
 
           <form onSubmit={handleSubmit} className="space-y-5">
-            {/* Roles */}
             <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
               {roles.map((role) => (
                 <button
@@ -154,7 +149,6 @@ export function Register() {
               ))}
             </div>
 
-            {/* Inputs */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div className="space-y-1">
                 <div className="flex justify-between items-center">
@@ -207,7 +201,6 @@ export function Register() {
               )}
             </div>
 
-            {/* Passwords */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div className="space-y-1">
                 <div className="flex justify-between items-center">
@@ -231,7 +224,6 @@ export function Register() {
               </div>
             </div>
 
-            {/* Password Validation UI */}
             {formData.password && (
               <div className="bg-gray-50 p-3 rounded-lg grid grid-cols-2 gap-x-4 gap-y-1 border border-gray-100">
                 {getPasswordRequirements(formData.password).map((req, i) => (

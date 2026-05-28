@@ -11,14 +11,11 @@ def test_analytics_dashboard_loading_and_cards(logged_in_driver):
     analytics page, and validates the presence of metric cards using Explicit Waits.
     """
     driver = logged_in_driver
-    # Increase the wait time to 15 seconds in case of a slow API
     wait = WebDriverWait(driver, 15)
 
-    # 1. Navigate to the analytics page
     driver.get(ANALYTICS_URL)
     print(f"\n[INFO] Navigated directly to Analytics page: {ANALYTICS_URL}")
 
-    # 2. Wait for the main page heading to load
     try:
         page_title = wait.until(
             EC.visibility_of_element_located((By.XPATH, "//h1[contains(text(), 'Platform Growth') or contains(text(), 'Statistics')]"))
@@ -31,7 +28,6 @@ def test_analytics_dashboard_loading_and_cards(logged_in_driver):
             "Check if the route is correctly specified in the ANALYTICS_URL constant."
         )
 
-    # 3. List of metrics to check (using substrings for flexibility)
     metrics_to_check = [
         "Residents",
         "Chat",
@@ -43,11 +39,8 @@ def test_analytics_dashboard_loading_and_cards(logged_in_driver):
     print("[INFO] Validating analytical cards with explicit waits...")
     for metric in metrics_to_check:
         try:
-            #  Flexible XPath: converts the page text to lowercase and searches for a match
-            # This protects against differences such as 'Total Chat Rooms' vs 'Chat rooms'
             xpath_selector = f"//*[contains(translate(text(), 'ABCDEFGHIJKLMNOPQRSTUVWXYZ', 'abcdefghijklmnopqrstuvwxyz'), '{metric.lower()}')]"
             
-            # Wait for each card to appear separately to handle API asynchronicity
             card_title = wait.until(EC.visibility_of_element_located((By.XPATH, xpath_selector)))
             print(f"  - Verified card containing: '{metric}'")
         except Exception:

@@ -15,7 +15,6 @@ export function ResetPassword() {
   const [error, setError] = useState('');
   const [isSuccess, setIsSuccess] = useState(false);
 
-  // Валідація сили пароля
   const passwordStrength = {
     hasMinLength: newPassword.length >= 8,
     hasUpperCase: /[A-Z]/.test(newPassword),
@@ -28,7 +27,6 @@ export function ResetPassword() {
     e.preventDefault();
     setError('');
 
-    // Перевірка вимог
     const allRequirementsMet = Object.values(passwordStrength).every(val => val === true);
     if (!allRequirementsMet) {
       setError('Password does not meet all requirements.');
@@ -43,8 +41,6 @@ export function ResetPassword() {
     setLoading(true);
 
     try {
-      // Запит до Django
-      // django-rest-passwordreset очікує 'password' та 'token'
       await axios.post('http://127.0.0.1:8000/api/password_reset/confirm/', {
         password: newPassword,
         token: token,
@@ -53,7 +49,6 @@ export function ResetPassword() {
       setIsSuccess(true);
       toast.success('Password reset successfully!');
       
-      // Автоматичний редирект через 3 секунди
       setTimeout(() => {
         navigate('/login');
       }, 3000);
@@ -124,7 +119,6 @@ export function ResetPassword() {
               </div>
             </div>
 
-            {/* Password Strength Box */}
             <div className="bg-gray-50 rounded-lg p-4 space-y-2 text-xs">
               <div className={`flex items-center gap-2 ${passwordStrength.hasMinLength ? 'text-green-600' : 'text-gray-400'}`}>
                 <CheckCircle className="w-3 h-3" /> 8+ characters

@@ -4,6 +4,4 @@ class ApiConfig(AppConfig):
     name = 'api'
 
     def ready(self):
-        import api.signals  # Обов'язково імпортуємо сигнали при запуску
-    # apps.py
- 
+        import api.signals  

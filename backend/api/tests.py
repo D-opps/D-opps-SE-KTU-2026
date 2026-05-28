@@ -18,11 +18,6 @@ class EventCaptureTest(TestCase):
 
 
     def test_signup_event_captured(self):
-        """
-        Given a signup action,
-        when the backend test runs,
-        then the event is asserted to be captured in AnalyticsEvent.
-        """
         user = User.objects.create_user(**self.user_data)
        
         AnalyticsEvent.objects.create(
@@ -39,11 +34,7 @@ class EventCaptureTest(TestCase):
 
 
     def test_marketplace_offer_action_captured(self):
-        """
-        Given a marketplace offer action (product creation),
-        when the backend test runs,
-        then the event is asserted to be captured.
-        """
+    
         seller = User.objects.create_user(**self.user_data)
        
         product = Product.objects.create(
@@ -71,7 +62,6 @@ class EventCaptureTest(TestCase):
 
 
 def test_create_and_favorite_product(self):
-    """Test: Product creation in marketplace and adding it to favorites"""
     buyer = User.objects.create_user(username="buyer", email="buyer@dorm.com", password="123")
     seller = User.objects.create_user(username="seller", email="seller@dorm.com", password="123")
     
@@ -89,7 +79,6 @@ def test_create_and_favorite_product(self):
 
 
 def test_chat_and_message_delivery(self):
-    """Test: Conversation initialization and unread counters incrementing"""
     user1 = User.objects.create_user(username="user1", email="u1@dorm.com")
     user2 = User.objects.create_user(username="user2", email="u2@dorm.com")
     
@@ -112,7 +101,6 @@ def test_chat_and_message_delivery(self):
 
 
 def test_laundry_machine_status_and_time(self):
-    """Test: Dynamic verification of computed minutes remaining for active cycles"""
     from .models import Machine
     import datetime
     
@@ -130,7 +118,6 @@ def test_laundry_machine_status_and_time(self):
 
 
 def test_create_user_report(self):
-    """Test: Verification of report logs hitting the moderation system queue"""
     reporter = User.objects.create_user(username="reporter", email="rep@dorm.com")
     offender = User.objects.create_user(username="offender", email="off@dorm.com")
     

@@ -23,7 +23,6 @@ export function Profile() {
 
   const dormitories = ['1', '2', '3', '4', '5', '6', '7', '8'];
 
-  // Перевірка, чи є користувач адміном або доркіпером
   const userRole = profileData?.role?.toLowerCase() || 'student';
   const isStaff = userRole === 'admin' || userRole === 'doorkeeper';
 
@@ -66,7 +65,6 @@ export function Profile() {
     formData.append('first_name', editForm.name);
     formData.append('dormitory', editForm.dormitory);
     
-    // Відправляємо номер кімнати тільки якщо користувач НЕ є адміном/доркіпером
     if (!isStaff) {
       formData.append('room_number', editForm.room);
     }
@@ -159,7 +157,6 @@ export function Profile() {
                 </div>
               </div>
               
-              {/* Показуємо кімнату в картці тільки якщо це не Адмін і не Доркіпер */}
               {!isStaff && (
                 <div className="flex items-center gap-4 text-gray-600">
                   <MapPin size={18} className="text-gray-400" />
@@ -177,7 +174,6 @@ export function Profile() {
           </div>
         </div>
 
-        {/* Список моїх товарів */}
         <div className="lg:col-span-2">
           <div className="bg-white rounded-3xl p-8 shadow-sm border border-gray-100 min-h-[400px]">
             <div className="flex items-center justify-between mb-8">
@@ -249,7 +245,6 @@ export function Profile() {
                 <input type="text" value={editForm.name} onChange={(e) => setEditForm({...editForm, name: e.target.value})} className="w-full px-5 py-3 bg-gray-50 rounded-xl outline-none focus:ring-2 focus:ring-blue-500 transition-all" />
               </div>
 
-              {/* Умовна структура сітки залежно від ролі */}
               <div className={isStaff ? "block" : "grid grid-cols-2 gap-4"}>
                 <div>
                   <label className="text-xs font-bold text-gray-400 uppercase ml-1">Dorm</label>
@@ -258,7 +253,6 @@ export function Profile() {
                   </select>
                 </div>
                 
-                {/* Інпут кімнати рендериться лише якщо користувач СТУДЕНТ */}
                 {!isStaff && (
                   <div>
                     <label className="text-xs font-bold text-gray-400 uppercase ml-1">Room</label>

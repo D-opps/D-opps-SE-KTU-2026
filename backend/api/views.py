@@ -2,7 +2,6 @@
 from rest_framework import viewsets, permissions, status, views
 from rest_framework.response import Response
 
-# Отримуємо твою кастомну модель User
 from rest_framework.permissions import AllowAny, IsAuthenticated
 from django.contrib.auth import get_user_model
 from rest_framework_simplejwt.tokens import RefreshToken
@@ -44,23 +43,22 @@ def search_user_by_email(request):
         "email": user.email,
     })# views.py
 @api_view(['GET'])
+@permission_classes([IsAuthenticated])
 def get_me(request):
     serializer = UserSerializer(request.user)
     return Response(serializer.data)
 class MachineViewSet(viewsets.ModelViewSet):
     serializer_class = MachineSerializer
-    permission_classes = [permissions.IsAuthenticated] # Базовий захист
+    permission_classes = [permissions.IsAuthenticated] 
 
     def get_queryset(self):
         user = self.request.user
-        # Авто-звільнення машинок, у яких вийшов час
         from django.utils import timezone
         Machine.objects.filter(
             status='occupied', 
             end_time__lte=timezone.now()
         ).update(status='free', end_time=None)
 
-        # Фільтрація: тільки машинки МОГО гуртожитку
         return Machine.objects.filter(dormitory=user.dormitory)
     
     def perform_create(self, serializer):
@@ -72,7 +70,6 @@ class MachineViewSet(viewsets.ModelViewSet):
     def report_status(self, request, pk=None):
         machine = self.get_object()
         new_status = request.data.get('status')
-        # ДОДАЙТЕ ОТРИМАННЯ ІМЕНІ:
         user_name = request.data.get('occupied_by', '') 
         notes = request.data.get('notes', '')
 
@@ -80,13 +77,11 @@ class MachineViewSet(viewsets.ModelViewSet):
         if new_status not in valid_statuses:
             return Response({'error': 'Invalid status'}, status=status.HTTP_400_BAD_REQUEST)
 
-        # Оновлення
         machine.status = new_status
         machine.notes = notes
         machine.reported_by = request.user
         machine.last_reported_at = timezone.now()
         
-        # ОСЬ ТУТ ДОДАЙТЕ ОНОВЛЕННЯ ІМЕНІ:
         if new_status == 'occupied':
             machine.occupied_by = user_name if user_name else "Користувач"
             try:
@@ -98,7 +93,7 @@ class MachineViewSet(viewsets.ModelViewSet):
         elif new_status == 'free':
             machine.end_time = None
             machine.notes = ''
-            machine.occupied_by = '' # СКИДАЄМО ІМ'Я, КОЛИ МАШИНКА ВІЛЬНА
+            machine.occupied_by = '' 
 
         machine.save()
         
@@ -119,17 +114,12 @@ class ProductViewSet(viewsets.ModelViewSet):
         product = self.get_object()
         user = request.user
         
-        # Шукаємо існуючий запис у таблиці Favorite
-        # Ми звертаємося до моделі Favorite безпосередньо
         favorite_exists = Favorite.objects.filter(user=user, product=product).first()
 
         if favorite_exists:
-            # Якщо запис є — видаляємо його (прибираємо з обраного)
             favorite_exists.delete()
             return Response({'is_favorite': False}, status=status.HTTP_200_OK)
         else:
-            # Якщо запису немає — створюємо (додаємо в обране)
-            # Тут ми явно створюємо об'єкт Favorite, як того хоче Django
             Favorite.objects.create(user=user, product=product)
             return Response({'is_favorite': True}, status=status.HTTP_201_CREATED)
 class RegisterView(views.APIView):
@@ -138,13 +128,11 @@ class RegisterView(views.APIView):
     def post(self, request):
         data = request.data
         try:
-            # Створюємо юзера
             user = User.objects.create_user(
                 username=data.get('email'), 
                 email=data.get('email'),
                 password=data.get('password'),
             )
-            # Записуємо повне ім'я в first_name (або кастомне поле, якщо воно є в моделі)
             user.first_name = data.get('full_name', '')
             user.role = data.get('role', 'student')
             user.room_number = data.get('room_number', '')
@@ -156,7 +144,6 @@ class RegisterView(views.APIView):
             user.save()
             return Response({"message": "User registered successfully"}, status=status.HTTP_201_CREATED)
         except Exception as e:
-            # Повертаємо зрозумілу помилку
             return Response({"error": str(e)}, status=status.HTTP_400_BAD_REQUEST)
 
 class GoogleLoginView(views.APIView):
@@ -165,7 +152,6 @@ class GoogleLoginView(views.APIView):
     def post(self, request):
         token = request.data.get('token')
         
-        # Використовуємо userinfo замість tokeninfo для access_token
         google_url = f"https://www.googleapis.com/oauth2/v3/userinfo?access_token={token}"
         response = requests.get(google_url)
         
@@ -177,7 +163,6 @@ class GoogleLoginView(views.APIView):
         email = user_data.get('email')
         first_name = user_data.get('given_name', user_data.get('name', ''))
 
-        # Шукаємо або створюємо користувача
         try:
             user = User.objects.get(email=email)
         except User.DoesNotExist:
@@ -205,9 +190,8 @@ class ConversationViewSet(viewsets.ModelViewSet):
     def create(self, request, *args, **kwargs):
         product_id = request.data.get('product_id')
         username = request.data.get('username')
-        chat_type = request.data.get('type')  # Отримуємо тип 'global' або 'dormitory'
+        chat_type = request.data.get('type')  
 
-        # --- СЦЕНАРІЙ 0: СПЕЦІАЛЬНІ ЧАТИ (Global/Dorm) ---
         if chat_type in ['global', 'dormitory']:
 
             if chat_type == 'dormitory':
@@ -235,14 +219,12 @@ class ConversationViewSet(viewsets.ModelViewSet):
                         type='global_chat'
                     )
 
-            # Додаємо юзера в учасники, якщо його там ще немає
             if request.user not in conversation.participants.all():
                 conversation.participants.add(request.user)
 
             serializer = self.get_serializer(conversation)
             return Response(serializer.data, status=200)
 
-        # --- СЦЕНАРІЙ 1: ЧАТ ПО ТОВАРУ (Твій старий код) ---
         if product_id:
             try:
                 product = Product.objects.get(id=product_id)
@@ -264,7 +246,6 @@ class ConversationViewSet(viewsets.ModelViewSet):
             except Product.DoesNotExist:
                 return Response({"error": "Product not found"}, status=404)
 
-        # --- СЦЕНАРІЙ 2: ПРИВАТНИЙ ЧАТ (Твій старий код) ---
         elif username:
             opponent = User.objects.filter(
                 Q(username__iexact=username) | Q(email__iexact=username)
@@ -293,46 +274,36 @@ class ConversationViewSet(viewsets.ModelViewSet):
     @action(detail=False, methods=['get'])
     def dormitory_chat(self, request):
             user = request.user
-            if not user.dormitory: # Перевір, чи поле називається dormitory чи dormitory_number у твоїй моделі User
+            if not user.dormitory:
                 return Response({"error": "Гуртожиток не вказано"}, status=400)
 
-            # Знаходимо або створюємо чат
             chat, created = Conversation.objects.get_or_create(
                 type='group',
-                dormitory_number=user.dormitory # Або user.dormitory_number
+                dormitory_number=user.dormitory 
             )
             
-            # Додаємо юзера до учасників, якщо його там немає
             if user not in chat.participants.all():
                 chat.participants.add(user)
 
             serializer = self.get_serializer(chat)
-            return Response(serializer.data) # ЦЕЙ РЯДОК МАЄ БУТИ ОБОВ'ЯЗКОВО  
+            return Response(serializer.data)  
     @action(detail=False, methods=['get'])
     def metrics(self, request):
             user = request.user
-            # Отримуємо період з параметрів запиту (дефолт 7 днів)
             period = int(request.query_params.get('period', 7))
             date_from = timezone.now() - timedelta(days=period)
             
-            # Визначаємо гуртожиток користувача
             user_dorm = getattr(user, 'dormitory', None)
 
-            # Якщо у користувача не вказано гуртожиток, можна або видати помилку, 
-            # або (якщо це СуперАдмін) показати все.
             if not user_dorm:
                 return Response({"error": "No dormitory assigned to user"}, status=400)
-
-            # Фільтруємо всі дані за гуртожитком
-            # Припускаємо, що у моделей User та Product є поле dormitory
-            # А у Message та Machine можна вийти через зв'язки
         
             return Response({
                 "totalUsers": User.objects.filter(dormitory=user_dorm).count(),
                 "verifiedUsers": User.objects.filter(dormitory=user_dorm, is_active=True).count(),
                 
                 "totalMessages": Message.objects.filter(
-                    conversation__dormitory_number=user_dorm # якщо в конверсації є номер дорму
+                    conversation__dormitory_number=user_dorm 
                 ).count(),
                 
                 "totalListings": Product.objects.filter(seller__dormitory=user_dorm).count(),
@@ -341,13 +312,11 @@ class ConversationViewSet(viewsets.ModelViewSet):
                     status='available'
                 ).count(),
                 
-                "dormitoryNumber": user_dorm # Повертаємо номер для заголовка на фронті
+                "dormitoryNumber": user_dorm 
             })
 
-    # views.py у класі ConversationViewSet або окремим методом
     @action(detail=False, methods=['get'])
     def recent_messages(self, request):
-            # Фільтруємо повідомлення: тільки ті, де користувач є учасником чату
             messages = Message.objects.filter(
                 conversation__participants=request.user
             ).order_by('-created_at')[:3]
@@ -361,32 +330,19 @@ class ConversationViewSet(viewsets.ModelViewSet):
             return Response(data)
     @action(detail=False, methods=['get'])
     def global_chat(self, request):
-        # Використовуємо тільки ті поля, які є в моделі.
-        # Якщо 'name' немає, ми можемо ідентифікувати глобальний чат просто за типом.
         conv, created = Conversation.objects.get_or_create(
             type='GLOBAL',
-            # Якщо у тебе немає поля для назви, просто прибери defaults або 
-            # використай існуюче поле, наприклад product_title (якщо це допустимо)
-            #defaults={'product_title': 'Global Student Chat'} 
         )
         
-        # Додаємо користувача до чату
         if request.user not in conv.participants.all():
             conv.participants.add(request.user)
             
         serializer = self.get_serializer(conv)
         return Response(serializer.data)
     def retrieve(self, request, *args, **kwargs):
-        # 1. Отримуємо об'єкт бесіди
         instance = self.get_object()
-        
-        # 2. Оновлюємо статус повідомлень:
-        # Всі повідомлення в цьому чаті, які:
-        # - ще не прочитані (is_read=False)
-        # - відправлені НЕ поточним користувачем (exclude(sender=request.user))
         instance.messages.filter(is_read=False).exclude(sender=request.user).update(is_read=True)
         
-        # 3. Повертаємо дані як зазвичай
         serializer = self.get_serializer(instance)
         return Response(serializer.data)
 
@@ -395,7 +351,6 @@ class MessageViewSet(viewsets.ModelViewSet):
     permission_classes = [permissions.IsAuthenticated]
 
     def get_queryset(self):
-        # Повідомлення лише з чатів, де є користувач
         return Message.objects.filter(
             conversation__participants=self.request.user
         )
@@ -411,11 +366,8 @@ class ProfileView(APIView):
         try:
             user = request.user
             
-            # Фільтруємо товари
             my_products = Product.objects.filter(seller=user)
             
-            # ВАЖЛИВО: Передаємо context={'request': request}
-            # Це виправить помилку 'NoneType' object has no attribute 'user'
             products_data = ProductSerializer(
                 my_products, 
                 many=True, 
@@ -442,11 +394,10 @@ class ProfileView(APIView):
             })
         except Exception as e:
             import traceback
-            print(traceback.format_exc()) # Це виведе повний шлях помилки в термінал
+            print(traceback.format_exc()) 
             return Response({"error": str(e)}, status=500)
 
     def patch(self, request):
-        # Робимо те саме для методу PATCH
         try:
             user = request.user
             data = request.data
@@ -493,12 +444,10 @@ class EventViewSet(viewsets.ModelViewSet):
             dormitory=self.request.user.dormitory
         )
 
-    # 🔥 OLD (leave for backward compatibility)
     @action(detail=True, methods=['post'])
     def rsvp(self, request, pk=None):
         return self._toggle_attendance(request, pk)
 
-    # 🔥 NEW CLEAN NAME
     @action(detail=True, methods=['post'])
     def toggle_attendance(self, request, pk=None):
         return self._toggle_attendance(request, pk)
@@ -524,11 +473,9 @@ class NotificationViewSet(viewsets.ModelViewSet):
     permission_classes = [permissions.IsAuthenticated]
 
     def get_queryset(self):
-        # Користувач бачить лише свої сповіщення, найновіші зверху
-        print(f"DEBUG: Поточний користувач -> {self.request.user}") # Додайте цей рядок
+        print(f"DEBUG: Current user -> {self.request.user}") 
         queryset = Notification.objects.filter(user=self.request.user).order_by('-created_at')
         
-        # Можливість фільтрації за типом через URL: /api/notifications/?type=offer
         n_type = self.request.query_params.get('type')
         if n_type:
             queryset = queryset.filter(notification_type=n_type)
@@ -536,12 +483,10 @@ class NotificationViewSet(viewsets.ModelViewSet):
 
     @action(detail=False, methods=['post'])
     def mark_all_as_read(self, request):
-        """Метод для позначення всіх сповіщень прочитаними за один клік"""
         Notification.objects.filter(user=request.user, is_read=False).update(is_read=True)
         return Response({'status': 'all notifications marked as read'}, status=status.HTTP_200_OK)
 
     def update(self, request, *args, **kwargs):
-        """Дозволяє оновити статус окремого сповіщення (наприклад, mark as read)"""
         partial = kwargs.pop('partial', False)
         instance = self.get_object()
         serializer = self.get_serializer(instance, data=request.data, partial=partial)
@@ -558,14 +503,12 @@ class IsAdminOrDoorkeeper(permissions.BasePermission):
     def has_permission(self, request, view):
         return request.user.is_authenticated and (request.user.role in ['admin', 'doorkeeper'])
 
-# 1. Створення скарги (для студента)
 from rest_framework import viewsets, permissions, status
 from rest_framework.decorators import action
 from rest_framework.response import Response
 from .models import Report
 from .serializers import ReportSerializer
 
-# 1. Створення скарги (тепер він точно існує)
 class CreateReportView(generics.CreateAPIView):
     serializer_class = ReportSerializer
     permission_classes = [permissions.IsAuthenticated]
@@ -596,7 +539,6 @@ class CreateReportView(generics.CreateAPIView):
             reported_user=reported_user
         )
 
-        # 🔥 NOTIFY ADMINS HERE
         admins = User.objects.filter(role__in=["admin", "doorkeeper"])
 
         for admin in admins:
@@ -614,19 +556,17 @@ class CreateReportView(generics.CreateAPIView):
 
 from django.utils import timezone
 from .models import Notification
-# 2. Універсальний в'юсет (об'єднали два дублікати в один)
 class ReportViewSet(viewsets.ModelViewSet):
     queryset = Report.objects.all()
     serializer_class = ReportSerializer
     permission_classes = [permissions.IsAuthenticated]
 
-    # Це дозволяє робити POST на /api/reports/manage/3/perform_action/
     @action(detail=True, methods=['post'])
     def perform_action(self, request, pk=None):
         report = self.get_object()
         action_type = request.data.get('action')
 
-        obj = report.content_object  # 🔥 ОЦЕ НАДІЙНО
+        obj = report.content_object 
 
         reported_user = None
 
@@ -706,7 +646,6 @@ from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated
 from django.utils import timezone
 
-# Імпортуємо всі моделі з твого проекту (перевір правильність імпорту під свою структуру папок)
 from .models import User, Product, Machine, Conversation, Message, Report, Notification
 
 from rest_framework.views import APIView
@@ -715,74 +654,53 @@ from rest_framework.permissions import IsAuthenticated
 from django.utils import timezone
 from django.db.models import Q
 
-# Імпортуємо ваші моделі
 from .models import User, Product, Machine, Conversation, Message, Report, Notification
 
 class DashboardMetricsView(APIView):
-    permission_classes = [IsAuthenticated] # Переконуємось, що юзер авторизований
+    permission_classes = [IsAuthenticated] 
 
     def get(self, request):
         today = timezone.now().date()
         
-        # 1. Отримуємо поточного адміна та його гуртожиток
         current_admin = request.user
         admin_dorm = getattr(current_admin, 'dormitory', None)
         
-        # Якщо у адміна чомусь не вказано гуртожиток, можна або повернути помилку, 
-        # або рахувати по всій системі. Зробимо базовий фільтр:
         if not admin_dorm:
             return Response({"error": "Admin has no assigned dormitory."}, status=400)
 
-        # 2. ФІЛЬТРУЄМО КОРИСТУВАЧІВ (тільки з гуртожитку цього адміна)
         users_in_dorm = User.objects.filter(dormitory=admin_dorm)
         total_users = users_in_dorm.count()
         signups_today = users_in_dorm.filter(date_joined__date=today).count()
 
-        # 3. ФІЛЬТРУЄМО ПРАЛЬНІ МАШИНИ
-        # УВАГА: Перевірте у вашій моделі Machine, як вона пов'язана з гуртожитком.
-        # Якщо у моделі Machine є поле 'dormitory', то фільтр буде такий:
         try:
             dorm_machines = Machine.objects.filter(dormitory=admin_dorm)
         except Exception:
-            # Якщо поля 'dormitory' в Machine немає, але є, наприклад, 'dormitory_number' (як у Conversation):
             try:
                 dorm_machines = Machine.objects.filter(dormitory_number=admin_dorm)
             except Exception:
-                # Якщо зв'язку взагалі немає, поки що беремо всі машинки (тимчасовий захист від помилки)
                 dorm_machines = Machine.objects.all()
 
         total_machines = dorm_machines.count()
         free_machines = dorm_machines.filter(status='free').count()
 
-        # 4. ФІЛЬТРУЄМО ЧАТИ ТА ПОВІДОМЛЕННЯ
-        # В admin.py для Conversation було вказано поле 'dormitory_number'. Використовуємо його:
         try:
             dorm_conversations = Conversation.objects.filter(dormitory_number=admin_dorm)
         except Exception:
-            # На випадок, якщо поле називається просто 'dormitory'
             dorm_conversations = Conversation.objects.filter(dormitory=admin_dorm)
 
         total_conversations = dorm_conversations.count()
         
-        # Рахуємо повідомлення за сьогодні, які належать ТІЛЬКИ чатам цього гуртожитку
         messages_today = Message.objects.filter(
             conversation__in=dorm_conversations, 
             created_at__date=today
         ).count()
 
-        # 5. ФІЛЬТРУЄМО МАРКЕТПЛЕЙС (Товари, які продають студенти з цього гуртожитку)
-        # Продукт пов'язаний з продавцем (seller), а продавець — це User, у якого є гуртожиток
         dorm_products = Product.objects.filter(seller__dormitory=admin_dorm)
         total_listings = Product.objects.count()
         listings_today = Product.objects.filter(created_at__date=today).count()
-
-        # 6. ФІЛЬТРУЄМО СКАРГИ (Скарги, які подали студенти цього гуртожитку)
         pending_reports = Report.objects.filter(reporter__dormitory=admin_dorm, status='pending').count()
-
-        # 7. ФІЛЬТРУЄМО СПОВІЩЕННЯ (Надіслані студентам цього гуртожитку)
         total_notifications = Notification.objects.filter(user__dormitory=admin_dorm).count()
 
-        # Віддаємо відфільтровані дані на фронтенд
         data = {
             "total_users": total_users,
             "signups_today": signups_today,

@@ -4,7 +4,6 @@ from django.conf import settings
 from django.conf.urls.static import static
 from rest_framework.routers import DefaultRouter
 
-# Імпортуємо модуль views цілком, щоб працював views.get_me
 from api import views 
 from api.views import (
     CreateReportView, GoogleLoginView, MachineViewSet, ReportViewSet, NotificationViewSet, ProductViewSet, 

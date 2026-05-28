@@ -67,7 +67,6 @@ def test_notifications_page_lifecycle(logged_in_driver):
     })();
     """
     
-    # Register the script in the Chromium engine so that it is executed ALWAYS
     driver.execute_cdp_cmd("Page.addScriptToEvaluateOnNewDocument", {
         "source": mock_network_js
     })
@@ -75,10 +74,8 @@ def test_notifications_page_lifecycle(logged_in_driver):
     print("[STEP 2] Navigating to the page and preparing localStorage...")
     driver.get(NOTIFICATIONS_URL)
     
-    # Ensure that the token is present so Axios does not fail before making the request
     driver.execute_script("localStorage.setItem('accessToken', 'mock-e2e-token-123');")
     
-    # Reload the page so React starts with the token and the activated network mock
     driver.refresh()
     wait.until(lambda d: d.execute_script("return document.readyState") == "complete")
     time.sleep(2)
@@ -92,7 +89,6 @@ def test_notifications_page_lifecycle(logged_in_driver):
         assert "Test message from Selenium" in unread_card.text
         print("  -> Notifications were successfully rendered in the UI!")
     except Exception as e:
-        # Take a screenshot to see the actual state of the screen, possibly just a blank screen due to a React error
         driver.save_screenshot("notifications_error_fallback.png")
         print("[ERR] Card not found. Screenshot saved as 'notifications_error_fallback.png'")
         raise e

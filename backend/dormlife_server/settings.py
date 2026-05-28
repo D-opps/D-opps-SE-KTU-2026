@@ -5,7 +5,6 @@ import os
 from pathlib import Path
 from datetime import timedelta
 
-# ПРИБЕРИ рядок "import sentry_sdk" звідси!
 
 try:
     import sentry_sdk
@@ -13,7 +12,7 @@ try:
     sentry_sdk.init(
         dsn="https://879cd28133bb1f8f6cb546a25cd58ba8@o4511331609214976.ingest.de.sentry.io/4511331617734736",
         send_default_pii=True,
-        integrations=[DjangoIntegration()], # Додай це для Django
+        integrations=[DjangoIntegration()], 
     )
 except ImportError:
     pass   
@@ -24,7 +23,6 @@ SECRET_KEY = 'django-insecure-&&fzdx3i5ygq(s+yd(0w)24_3syzs!_1m15qv_9h9j@x-megl8
 DEBUG = True
 ALLOWED_HOSTS = ['*']
 
-# --- APPLICATIONS ---
 INSTALLED_APPS = [
     'django.contrib.admin',
     'django.contrib.auth',
@@ -33,19 +31,16 @@ INSTALLED_APPS = [
     'django.contrib.messages',
     'django.contrib.staticfiles',
     
-    # Бібліотеки
     'rest_framework',
-    'rest_framework_simplejwt',      # Для JWT токенів
-    'django_rest_passwordreset',     # Для скидання пароля
-    'corsheaders',                  # Для зв'язку з React
+    'rest_framework_simplejwt',      
+    'django_rest_passwordreset',     
+    'corsheaders',                 
     
-    # Твій додаток
     'api',
 ]
 
-# --- MIDDLEWARE ---
 MIDDLEWARE = [
-    'corsheaders.middleware.CorsMiddleware',  # Має бути першим!
+    'corsheaders.middleware.CorsMiddleware',  
     'django.middleware.security.SecurityMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
     'django.middleware.common.CommonMiddleware',
@@ -55,17 +50,14 @@ MIDDLEWARE = [
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
 ]
 
-# --- CORS SETTINGS ---
 CORS_ALLOWED_ORIGINS = [
     "http://localhost:5173",
     "http://127.0.0.1:5173",
 ]
 CORS_ALLOW_ALL_ORIGINS = True 
 
-# --- AUTH & USER ---
 AUTH_USER_MODEL = 'api.User'
 
-# --- REST FRAMEWORK CONFIG ---
 REST_FRAMEWORK = {
     'DEFAULT_AUTHENTICATION_CLASSES': (
         'rest_framework_simplejwt.authentication.JWTAuthentication',
@@ -75,7 +67,6 @@ REST_FRAMEWORK = {
     ]
 }
 
-# --- JWT SETTINGS ---
 SIMPLE_JWT = {
     'ACCESS_TOKEN_LIFETIME': timedelta(days=1),
     'REFRESH_TOKEN_LIFETIME': timedelta(days=7),
@@ -85,11 +76,8 @@ SIMPLE_JWT = {
     'AUTH_HEADER_TYPES': ('Bearer',),
 }
 
-# --- EMAIL SETTINGS (Для скидання пароля) ---
-# Поки що виводимо листи в консоль термінала
 EMAIL_BACKEND = 'django.core.mail.backends.console.EmailBackend'
 
-# --- DATABASE ---
 DATABASES = {
     'default': {
         'ENGINE': 'django.db.backends.sqlite3',
@@ -97,16 +85,13 @@ DATABASES = {
     }
 }
 
-# --- MEDIA & STATIC ---
 STATIC_URL = 'static/'
 MEDIA_URL = '/media/'
 MEDIA_ROOT = os.path.join(BASE_DIR, 'media')
 
-# --- URLS & WSGI ---
 ROOT_URLCONF = 'dormlife_server.urls'
 WSGI_APPLICATION = 'dormlife_server.wsgi.application'
 
-# --- TEMPLATES ---
 TEMPLATES = [
     {
         'BACKEND': 'django.template.backends.django.DjangoTemplates',
@@ -124,21 +109,15 @@ TEMPLATES = [
 
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
-# settings.py
-
-# Налаштування для надсилання справжніх листів через Gmail
 EMAIL_BACKEND = 'django.core.mail.backends.smtp.EmailBackend'
 EMAIL_HOST = 'smtp.gmail.com'
 EMAIL_PORT = 587
 EMAIL_USE_TLS = True
 
-# Впиши сюди свою пошту Google
 EMAIL_HOST_USER = 'polina.sevastianova9@gmail.com' 
 
-# Встав сюди свій 16-значний код БЕЗ пробілів
 EMAIL_HOST_PASSWORD = 'wlglffhanapxwsqj'
 
-# Як саме буде підписаний відправник у листі
 DEFAULT_FROM_EMAIL = 'DormLife Team <polina.sevastianova9@gmail.com>'
 
 LANGUAGE_CODE = 'en-us' 

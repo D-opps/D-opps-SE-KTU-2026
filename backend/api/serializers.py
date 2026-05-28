@@ -16,14 +16,14 @@ from .models import Report
 
 from rest_framework import serializers
 from .models import Report
-from django.contrib.contenttypes.models import ContentType # <--- ЦЬОГО НЕ ВИСТАЧАЛО
+from django.contrib.contenttypes.models import ContentType 
 
 from rest_framework import serializers
-from .models import Report, Product, User # Імпортуй потрібні моделі
+from .models import Report, Product, User 
 
 from django.contrib.contenttypes.models import ContentType
 from rest_framework import serializers
-from .models import Report, Product, User # Додай свої імпорти моделей
+from .models import Report, Product, User 
 
 class ReportSerializer(serializers.ModelSerializer):
     reporter_name = serializers.ReadOnlyField(source='reporter.first_name')
@@ -38,27 +38,22 @@ class ReportSerializer(serializers.ModelSerializer):
             'reason', 'description', 'status', 'created_at', 
             'content_type', 'object_id', 'content_details', 'model_name'
         ]
-        # ВАЖЛИВО: додаємо reporter у read_only
         read_only_fields = ['reporter', 'status', 'created_at', 'content_type']
 
     def get_content_details(self, obj):
-        # ... твій попередній код без змін ...
         target = obj.content_object
         return str(target) if target else "Об'єкт видалено"
 
     def create(self, validated_data):
-        # Витягуємо model_name, щоб знайти ContentType
         model_name = validated_data.pop('model_name').lower()
         
         try:
-            # Знаходимо потрібний тип контенту
             from django.contrib.contenttypes.models import ContentType
             ctype = ContentType.objects.get(model=model_name)
             validated_data['content_type'] = ctype
         except Exception:
             raise serializers.ValidationError({"model_name": "Invalid model type"})
 
-        # ПРИВ'ЯЗУЄМО ЮЗЕРА: Беремо його з контексту запиту
         validated_data['reporter'] = self.context['request'].user
         
         return super().create(validated_data)
@@ -105,15 +100,11 @@ class ProductSerializer(serializers.ModelSerializer):
     def get_is_favorite(self, obj):
         user = self.context.get('request').user
         if user and user.is_authenticated:
-            # Перевіряємо, чи існує запис у Favorite для цього продукту та юзера
             return Favorite.objects.filter(user=user, product=obj).exists()
         return False
 
-# --- ОСНОВНІ ЗМІНИ ТУТ ---
-
 class MessageSerializer(serializers.ModelSerializer):
     sender_name = serializers.ReadOnlyField(source='sender.first_name')
-    # Додаємо read_only=True для sender
     sender = serializers.PrimaryKeyRelatedField(read_only=True) 
     created_at = serializers.DateTimeField(read_only=True)
 
@@ -124,10 +115,6 @@ class ConversationSerializer(serializers.ModelSerializer):
     
     messages = MessageSerializer(many=True, read_only=True)
     product_title = serializers.ReadOnlyField(source='product.title')
-    #product_id = serializers.IntegerField(required=False, allow_null=True)
-    #participants = UserSerializer(many=True, read_only=True)
-    #receiver_id = serializers.CharField(required=False, allow_null=True)
-
     product_id = serializers.IntegerField(required=False, allow_null=True, write_only=True)
     username = serializers.CharField(required=False, allow_null=True, write_only=True)
     receiver_id = serializers.CharField(required=False, allow_null=True, write_only=True)
@@ -155,22 +142,15 @@ class ConversationSerializer(serializers.ModelSerializer):
 
         return f"Chat #{obj.id}"
     def create(self, validated_data):
-        # 1. Видаляємо допоміжні поля з validated_data, щоб вони не потрапили в Conversation.objects.create()
         username = validated_data.pop('username', None)
         receiver_id = validated_data.pop('receiver_id', None)
         product_id = validated_data.pop('product_id', None)
-
-        # 2. Отримуємо поточного користувача (відправника)
         request = self.context.get('request')
         current_user = request.user
-
-        # 3. Створюємо саму бесіду
         conversation = Conversation.objects.create(**validated_data)
 
-        # 4. Логіка додавання учасників
         participants = [current_user]
         
-        # Шукаємо отримувача за ID або за Username
         if receiver_id:
             from django.contrib.auth import get_user_model
             User = get_user_model()
@@ -184,7 +164,6 @@ class ConversationSerializer(serializers.ModelSerializer):
             if receiver:
                 participants.append(receiver)
 
-        # Додаємо всіх учасників у ManyToMany поле
         conversation.participants.set(participants)
 
         return conversation
@@ -204,7 +183,6 @@ class EventSerializer(serializers.ModelSerializer):
 
     attendees = serializers.SerializerMethodField()
 
-    # 🔥 FIX: allow empty description
     description = serializers.CharField(required=False, allow_blank=True, allow_null=True)
 
     class Meta:
@@ -214,7 +192,7 @@ class EventSerializer(serializers.ModelSerializer):
             'title',
             'description',
             'date',
-            'end_date',   # 🔥 NEW
+            'end_date',   
             'location',
             'dormitory',
             'creator',
@@ -240,5 +218,5 @@ class NotificationSerializer(serializers.ModelSerializer):
         model = Notification
         fields = [
             'id', 'notification_type', 'title', 'description', 
-            'target_id', 'is_read', 'created_at' # Тут має бути created_at
+            'target_id', 'is_read', 'created_at'
         ]

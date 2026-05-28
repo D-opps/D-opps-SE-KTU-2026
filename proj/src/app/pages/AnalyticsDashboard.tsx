@@ -5,19 +5,16 @@ import {
   ShieldAlert, WashingMachine, AlertTriangle, Bell 
 } from 'lucide-react';
 
-// --- Інтерфейс для отриманих даних від Django API ---
 interface DashboardMetrics {
   total_users: number;
   signups_today: number;
   total_listings: number;
   listings_today: number;
   
-  // Нові поля, які ми тягнемо з Conversation та Message
   total_conversations: number;
   messages_today: number;
-  active_chats_today?: number; // На випадок використання старого логу подій
+  active_chats_today?: number; 
 
-  // Додаткові моделі з admin.py
   total_machines: number;
   free_machines: number;
   total_reports: number;
@@ -34,13 +31,11 @@ export function AnalyticsDashboard() {
       try {
         const token = localStorage.getItem('accessToken');
         
-        // Якщо токена взагалі немає в браузері — одразу блокуємо
         if (!token) {
           setError("Unauthorized: Please log in as an Admin.");
           return;
         }
 
-        // Робимо запит на правильний ендпоінт
         const response = await axios.get<DashboardMetrics>('http://127.0.0.1:8000/api/admin/metrics/', {
           headers: { Authorization: `Bearer ${token}` }
         });
@@ -59,7 +54,6 @@ export function AnalyticsDashboard() {
     fetchMetrics();
   }, []);
 
-  // Якщо сталася помилка доступу (наприклад, зайшов звичайний студент)
   if (error) {
     return (
       <div className="p-10 flex flex-col items-center justify-center text-center gap-4 min-h-[50vh]">
@@ -70,10 +64,8 @@ export function AnalyticsDashboard() {
     );
   }
 
-  // Поки дані вантажаться
   if (!metrics) return <div className="p-10 text-center font-bold text-gray-400">Loading Metrics...</div>;
 
-  // Компонент картки з чіткими типами пропсів
   const StatCard = ({ title, value, icon: Icon, color }: { title: string; value: number | string; icon: any; color: string }) => (
     <div className="bg-white p-6 rounded-[2rem] shadow-sm border border-gray-100 flex items-center gap-5 hover:shadow-md transition-all">
       <div className={`p-4 rounded-2xl ${color} text-white`}>
@@ -89,15 +81,12 @@ export function AnalyticsDashboard() {
   return (
     <div className="p-8 max-w-7xl mx-auto space-y-10">
       
-      {/* ЗАГОЛОВОК СТОРІНКИ */}
       <h1 className="text-3xl font-black mb-8 flex items-center gap-3">
         <TrendingUp className="text-blue-600" /> Platform Growth & Statistics
       </h1>
 
-      {/* ОСНОВНА СІТКА КАРТОК АНАЛІТИКИ */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
         
-        {/* КАРТКИ КОРИСТУВАЧІВ */}
         <StatCard 
           title="Total Residents" 
           value={metrics.total_users} 
@@ -111,7 +100,6 @@ export function AnalyticsDashboard() {
           color="bg-orange-500" 
         />
         
-        {/* КАРТКИ МАРКЕТПЛЕЙСУ */}
         <StatCard 
           title="Marketplace Size" 
           value={metrics.total_listings} 
@@ -125,7 +113,6 @@ export function AnalyticsDashboard() {
           color="bg-pink-500" 
         />
 
-        {/* КАРТКИ СТАНУ ПРАЛЬНІ (Модель Machine з вашої адмінки) */}
         <StatCard 
           title="Laundry Units" 
           value={`${metrics.free_machines} Free / ${metrics.total_machines}`} 
@@ -133,7 +120,6 @@ export function AnalyticsDashboard() {
           color="bg-teal-600" 
         />
 
-        {/* КАРТКА МОДЕРАЦІЇ ТА СКАРГ (Модель Report з вашої адмінки) */}
         <StatCard 
           title="Active Reports" 
           value={metrics.pending_reports} 
@@ -141,7 +127,6 @@ export function AnalyticsDashboard() {
           color={metrics.pending_reports > 0 ? "bg-rose-500 animate-pulse" : "bg-slate-500"} 
         />
 
-        {/* СИСТЕМНІ СПОВІЩЕННЯ (Модель Notification з вашої адмінки) */}
         <StatCard 
           title="Total Notifications" 
           value={metrics.total_notifications} 

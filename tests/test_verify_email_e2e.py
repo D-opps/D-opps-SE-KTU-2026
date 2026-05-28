@@ -17,21 +17,16 @@ def driver():
     driver.quit()
 
 def test_verify_email_success_flow(driver):
-    # Direct navigation
     driver.get(f"{BASE_URL}/verify-email?token=valid-token&email=test@example.com")
     
-    # Give time for rendering and network requests
     import time
     time.sleep(3)
     
-    # Output all text from the page body
     body_text = driver.find_element(By.TAG_NAME, "body").text
     print(f"\n--- BODY TEXT SUCCESS FLOW ---")
     print(body_text)
     print(f"------------------------------")
     
-    # Now the test will simply output the text instead of failing. 
-    # Run pytest -s and send me what is displayed in the console.
     assert len(body_text) > 0, "The page is empty!"
 
 def test_verify_email_failed_flow(driver):
